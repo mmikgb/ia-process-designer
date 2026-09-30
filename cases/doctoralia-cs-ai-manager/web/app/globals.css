@@ -13,6 +13,17 @@
   --color-risk-watch: var(--risk-watch);
   --color-risk-atrisk: var(--risk-atrisk);
   --color-risk-critical: var(--risk-critical);
+  --color-chip-green: var(--chip-green);
+  --color-chip-green-fg: var(--chip-green-fg);
+  --color-chip-amber: var(--chip-amber);
+  --color-chip-amber-fg: var(--chip-amber-fg);
+  --color-chip-red: var(--chip-red);
+  --color-chip-red-fg: var(--chip-red-fg);
+  --color-chip-blue: var(--chip-blue);
+  --color-chip-blue-fg: var(--chip-blue-fg);
+  --color-chip-violet: var(--chip-violet);
+  --color-chip-violet-fg: var(--chip-violet-fg);
+  --shadow-card: var(--card-shadow);
   --font-sans: 'Geist', 'Geist Fallback';
   --font-mono: 'Geist Mono', 'Geist Mono Fallback';
   --color-sidebar-ring: var(--sidebar-ring);
@@ -59,11 +70,13 @@
   color-scheme: light;
   /* Doctoralia brand tokens (supplied by Miguel). Body text is ink, not green:
      the brand green is for the hero number, links, focus and "good". */
-  --background: #ffffff;
+  /* Layout after the references (docs/design-refs): a light surface page, white cards
+     with a 1px border and a very soft shadow. */
+  --background: #f5f2ef;
   --foreground: #2a2623;
-  --card: #f5f2ef;
+  --card: #ffffff;
   --card-foreground: #2a2623;
-  --popover: #f5f2ef;
+  --popover: #ffffff;
   --popover-foreground: #2a2623;
   --primary: #006a59;
   --primary-foreground: #ffffff;
@@ -76,9 +89,21 @@
   --accent: #eee7fd;
   --accent-foreground: #2a2623;
   --destructive: #b42318;
-  --border: #e2dcd6;
+  --border: #e9e3dc;
   --input: #e2dcd6;
   --ring: #006a59;
+  --card-shadow: 0 1px 2px rgb(42 38 35 / 0.04), 0 1px 12px rgb(42 38 35 / 0.04);
+  /* Icon chips: ~11% of the hue on white, text in the full hue. All >= 4.5:1. */
+  --chip-green: #e3efed;
+  --chip-green-fg: #006a59;
+  --chip-amber: #f2ede3;
+  --chip-amber-fg: #8a5d00;
+  --chip-red: #f7e7e6;
+  --chip-red-fg: #b42318;
+  --chip-blue: #e6ecfb;
+  --chip-blue-fg: #1d4ed8;
+  --chip-violet: #efe7fb;
+  --chip-violet-fg: #6d28d9;
   /* chart steps: validated with the dataviz palette checks on #f5f2ef (brand #006a59
      reads gray as a mark, chroma 0.087; #00806a is the nearest passing step) */
   --chart-1: #00806a;
@@ -86,7 +111,7 @@
   --chart-3: #6b635c;
   --chart-4: #c2410c;
   --chart-5: #b42318;
-  --radius: 0.75rem;
+  --radius: 0.875rem;
   --success: #006a59;
   --success-foreground: #ffffff;
   --warning: #8a5d00; /* text-safe amber, 5.2:1 on surface; #b7791f stays for fills */
@@ -95,13 +120,13 @@
   --risk-watch: #b7791f;
   --risk-atrisk: #c2410c;
   --risk-critical: #b42318;
-  --sidebar: #f5f2ef;
+  --sidebar: #ffffff;
   --sidebar-foreground: #2a2623;
   --sidebar-primary: #006a59;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #eee7fd;
   --sidebar-accent-foreground: #2a2623;
-  --sidebar-border: #e2dcd6;
+  --sidebar-border: #e9e3dc;
   --sidebar-ring: #006a59;
 }
 
@@ -123,9 +148,21 @@
   --accent: #2a2623;
   --accent-foreground: #f5f2ef;
   --destructive: #f97066;
-  --border: #3a3531;
+  --border: #332e2a;
   --input: #3a3531;
   --ring: #3cc4a8;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 0.25), 0 1px 12px rgb(0 0 0 / 0.2);
+  /* ~16% of the hue on the dark card, text in the lighter hue. All >= 4.5:1. */
+  --chip-green: #243731;
+  --chip-green-fg: #3cc4a8;
+  --chip-amber: #3e321f;
+  --chip-amber-fg: #e0a53c;
+  --chip-red: #422926;
+  --chip-red-fg: #f97066;
+  --chip-blue: #2e313f;
+  --chip-blue-fg: #7aa2ff;
+  --chip-violet: #372f3d;
+  --chip-violet-fg: #b794f6;
   /* validated on #1f1c1a: kept inside the dark lightness band */
   --chart-1: #31a88e;
   --chart-2: #c1862b;
@@ -146,7 +183,7 @@
   --sidebar-primary-foreground: #0b1f1a;
   --sidebar-accent: #2a2623;
   --sidebar-accent-foreground: #f5f2ef;
-  --sidebar-border: #3a3531;
+  --sidebar-border: #332e2a;
   --sidebar-ring: #3cc4a8;
 }
 
