@@ -2,6 +2,7 @@ import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
+import { I18nProvider } from '@/lib/i18n'
 import './globals.css'
 
 const _geistSans = Geist({ subsets: ['latin'], variable: '--font-sans' })
@@ -10,8 +11,7 @@ const _geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-mono' })
 export const metadata: Metadata = {
   title: 'CS Control Room',
   description:
-    'Customer-success dashboard for the doctor-booking portfolio: health score, KPIs, attention accounts, onboarding trends, and the act-now watchlist.',
-  generator: 'v0.app',
+    'Herramienta diaria de Customer Success: el día de cada especialista, las señales de la cartera y el control del manager.',
   icons: {
     icon: [
       {
@@ -46,7 +46,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="es-MX"
       className={`bg-background ${_geistSans.variable} ${_geistMono.variable}`}
       suppressHydrationWarning
     >
@@ -57,7 +57,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <I18nProvider>{children}</I18nProvider>
         </ThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

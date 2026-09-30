@@ -1,5 +1,5 @@
 // A bundle string is plain text or {en, es}. tx() picks the side to show.
-// T2.3 moves the locale into the I18nProvider; until then the UI is English.
+// Components use useT().tx, which binds the current locale (lib/i18n).
 export type I18n = { en: string; es: string }
 export type Text = string | I18n
 

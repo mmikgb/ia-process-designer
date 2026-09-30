@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { formatDeltaPct, isGoodDelta, pyFormat } from "@/lib/format"
 import type { KpiItem } from "@/lib/types"
-import { tx } from "@/lib/tx"
+import { useT } from "@/lib/i18n"
 
 export function KpiGrid({ kpis }: { kpis: KpiItem[] }) {
   return (
@@ -20,6 +20,7 @@ export function KpiGrid({ kpis }: { kpis: KpiItem[] }) {
 }
 
 function KpiCard({ kpi }: { kpi: KpiItem }) {
+  const { tx } = useT()
   const hasDelta = kpi.delta_pct !== null
   const isIncrease = hasDelta && kpi.delta_pct! > 0
   const good = hasDelta && isGoodDelta(kpi.delta_pct!, kpi.good)

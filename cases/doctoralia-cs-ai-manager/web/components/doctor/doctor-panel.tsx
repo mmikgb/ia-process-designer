@@ -9,7 +9,7 @@ import { formatPercent } from "@/lib/format"
 import { loadDossier } from "@/lib/dossiers"
 import type { Handled } from "@/lib/controls"
 import type { Dossier } from "@/lib/types"
-import { tx } from "@/lib/tx"
+import { useT } from "@/lib/i18n"
 
 const MODE: Record<string, { label: string; icon: typeof Copy }> = {
   draft: { label: "Draft message", icon: Copy },
@@ -73,6 +73,7 @@ export function DoctorPanel({
   onHandle: (h: Handled | null) => void
   onClose: () => void
 }) {
+  const { tx } = useT()
   const [doc, setDoc] = useState<Dossier | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [text, setText] = useState("")
