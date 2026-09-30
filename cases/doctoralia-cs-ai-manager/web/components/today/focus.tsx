@@ -1,8 +1,9 @@
 "use client"
 
 // Modo ráfaga: one doctor at a time, in the day's order, with the outcome a key away.
-import { useEffect, useRef, useState } from "react"
-import { ArrowRight, Check, CheckCircle2, Copy, RotateCcw, TriangleAlert } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { ArrowRight, CheckCircle2 } from "lucide-react"
+import { ActionPanel } from "@/components/doctor/action-panel"
 import { AgreedDialog } from "@/components/today/agreed-dialog"
 import { NA_REASONS, copiedDrafts, useLogOutcome } from "@/components/today/outcome-menu"
 import { BLOCK } from "@/components/today/style"
@@ -25,8 +26,10 @@ export function FocusMode({ day, open, onOpenChange }: { day: Day; open: boolean
   const [walk, setWalk] = useState<Planned[]>([])
   const [i, setI] = useState(0)
   const [book, setBook] = useState<Map<string, Dossier> | null>(null)
-  const [text, setText] = useState("")
-  const [copied, setCopied] = useState(false)
+  const edited = useRef(false)
+  const onEdited = useCallback((e: boolean) => {
+    edited.current = e
+  }, [])
   const [agreed, setAgreed] = useState(false)
   const [na, setNa] = useState(false)
   const busy = useRef(false)
@@ -47,31 +50,20 @@ export function FocusMode({ day, open, onOpenChange }: { day: Day; open: boolean
 
   const y = walk[i] as Planned | undefined
   const doc = y && book ? (book.get(y.doctor_id) ?? null) : undefined
-  const original = doc?.copilot.draft ?? ""
 
   useEffect(() => {
-    setText(original)
-    setCopied(false)
+    edited.current = false
     setNa(false)
-  }, [y?.doctor_id, original])
+  }, [y?.doctor_id])
 
   const log = async (o: Outcome, extra: LogExtra = {}) => {
     if (!y || busy.current) return
     busy.current = true
     try {
-      await logOutcome(y, o, { draft_edited: !!original && text !== original, ...extra })
+      await logOutcome(y, o, { draft_edited: edited.current, ...extra })
       setI((n) => n + 1)
     } finally {
       busy.current = false
-    }
-  }
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text)
-      copiedDrafts.add(y!.doctor_id)
-      setCopied(true)
-    } catch {
-      setCopied(false)
     }
   }
   const keepGoing = () => {
@@ -219,59 +211,20 @@ export function FocusMode({ day, open, onOpenChange }: { day: Day; open: boolean
               </section>
 
               {/* right: the action */}
-              <section className="flex flex-col gap-4 p-6">
-                {y.block === "followup" && (
-                  <div className="rounded-lg bg-chip-blue px-3 py-2 text-sm font-medium text-chip-blue-fg">{tx(y.reason)}</div>
-                )}
-                {doc?.copilot.i18n.channel && (
-                  <div className="flex items-start gap-2 rounded-lg bg-chip-amber px-3 py-2 text-sm text-chip-amber-fg">
-                    <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-                    <span>
-                      <span className="font-medium">{t("focus.channel")}:</span> {tx(doc.copilot.i18n.channel)}
-                    </span>
-                  </div>
-                )}
+              <section className="p-6">
                 {doc === undefined ? (
                   <Skeleton className="h-56" />
-                ) : doc?.copilot.draft && doc.copilot.confident ? (
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <h4 className="text-sm font-semibold text-foreground">{t("focus.draft")}</h4>
-                      {doc.copilot.i18n.ask && <span className="text-xs text-muted-foreground">{tx(doc.copilot.i18n.ask)}</span>}
-                    </div>
-                    <textarea
-                      value={text}
-                      onChange={(e) => {
-                        setText(e.target.value)
-                        setCopied(false)
-                      }}
-                      rows={9}
-                      aria-label={t("focus.draft")}
-                      className="w-full resize-y rounded-lg border border-input bg-card p-3 text-sm leading-relaxed text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                    />
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" onClick={copy}>
-                        {copied ? <Check /> : <Copy />}
-                        {copied ? t("focus.copied") : t("focus.copy")}
-                      </Button>
-                      {text !== original && (
-                        <Button size="sm" variant="ghost" onClick={() => setText(original)}>
-                          <RotateCcw />
-                          {t("focus.reset")}
-                        </Button>
-                      )}
-                    </div>
-                    {doc.copilot.i18n.why && <p className="text-xs text-pretty text-muted-foreground">{tx(doc.copilot.i18n.why)}</p>}
-                  </div>
-                ) : doc?.copilot.i18n.instead ? (
-                  <div className="flex flex-col gap-2">
-                    <h4 className="text-sm font-semibold text-foreground">
-                      {handoff ? t("focus.handoff") : doc.copilot.mode === "brief" ? t("focus.brief") : t("focus.facts")}
-                    </h4>
-                    <pre className="rounded-lg border border-border bg-background p-4 font-sans text-sm leading-relaxed whitespace-pre-wrap text-foreground">
-                      {tx(doc.copilot.i18n.instead)}
-                    </pre>
-                  </div>
+                ) : doc ? (
+                  <ActionPanel
+                    doc={doc}
+                    onCopied={() => copiedDrafts.add(y.doctor_id)}
+                    onEdited={onEdited}
+                    banner={
+                      y.block === "followup" && (
+                        <div className="rounded-lg bg-chip-blue px-3 py-2 text-sm font-medium text-chip-blue-fg">{tx(y.reason)}</div>
+                      )
+                    }
+                  />
                 ) : (
                   <p className="text-sm text-muted-foreground">{t("focus.nodraft")}</p>
                 )}

@@ -2,10 +2,8 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useCallback, useEffect, useState } from "react"
-import { DoctorPanel } from "@/components/doctor/doctor-panel"
-import { useHandled } from "@/lib/handled"
+import { DoctorSheet } from "@/components/doctor/doctor-sheet"
 import { loadSearch } from "@/lib/search"
-import { useShell } from "@/lib/shell"
 
 /** The one doctor sheet, on every screen, driven by ?doctor=D03810 (back/forward and links work). */
 export function DoctorSheetHost() {
@@ -27,10 +25,8 @@ function Host() {
   const params = useSearchParams()
   const router = useRouter()
   const path = usePathname()
-  const shell = useShell()
   const id = params.get("doctor")
   const [target, setTarget] = useState<{ id: string; owner: string } | null>(null)
-  const [handled, setHandled] = useHandled()
 
   useEffect(() => {
     let live = true
@@ -57,18 +53,5 @@ function Host() {
     router.replace(rest ? `${path}?${rest}` : path, { scroll: false })
   }, [params, path, router])
 
-  const ownerName = useCallback(
-    (sid: string) => shell.specialists.find((s) => s.id === sid)?.name ?? sid,
-    [shell.specialists],
-  )
-
-  return (
-    <DoctorPanel
-      target={target}
-      ownerName={ownerName}
-      handled={target ? handled[target.id] : undefined}
-      onHandle={(h) => target && setHandled(target.id, h)}
-      onClose={close}
-    />
-  )
+  return <DoctorSheet target={target} onClose={close} />
 }

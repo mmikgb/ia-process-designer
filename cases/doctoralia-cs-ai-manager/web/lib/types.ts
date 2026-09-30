@@ -253,6 +253,8 @@ export interface Dossier {
   top_signal: string | null
   top_signal_at: string | null
   top_signal_note: string | null
+  onboarding_closed_at?: string | null
+  calendar_enabled_at?: string | null
   bookings: { month: string; patient_bookings: number; admin_bookings: number }[]
   bookings_last: number | null
   bookings_prev: number | null

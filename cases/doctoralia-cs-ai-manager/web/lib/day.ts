@@ -78,21 +78,16 @@ export interface LogExtra {
   undo_of?: string
 }
 
-export function useDay(owner: string | null): Day | null {
-  const file = useQueue(owner)
-  const work = useWork(owner)
+/** Log an outcome for a doctor of `owner`, stamped with the app's day and who did it. */
+export function useLogFor(owner: string | null, record?: ReturnType<typeof useWork>["record"]): Day["log"] {
+  const own = useWork(record ? null : owner)
+  const rec = record ?? own.record
   const clock = useClock()
   const { who } = useIdentity()
-  const defaults = useMemo<PlanOptions | null>(
-    () => (file ? { capacity: file.capacity, quota: file.followup_quota, window: file.followup_stale_days } : null),
-    [file],
-  )
-  const { opts, custom, set } = usePlanOptions(owner, defaults)
   const today = clock.today
-
-  const log = useCallback<Day["log"]>(
+  return useCallback<Day["log"]>(
     (x, outcome, extra = {}) =>
-      work.record({
+      rec({
         doctor_id: x.doctor_id,
         doctor_name: x.doctor_name ?? null,
         owner: owner!,
@@ -103,8 +98,22 @@ export function useDay(owner: string | null): Day | null {
         ...extra,
         next_due: outcome === "undo" ? null : (extra.next_due ?? nextDueFor(outcome, today, extra.next_due)),
       }),
-    [work, owner, who, today],
+    [rec, owner, who, today],
   )
+}
+
+export function useDay(owner: string | null): Day | null {
+  const file = useQueue(owner)
+  const work = useWork(owner)
+  const clock = useClock()
+  const defaults = useMemo<PlanOptions | null>(
+    () => (file ? { capacity: file.capacity, quota: file.followup_quota, window: file.followup_stale_days } : null),
+    [file],
+  )
+  const { opts, custom, set } = usePlanOptions(owner, defaults)
+  const today = clock.today
+
+  const log = useLogFor(owner, work.record)
 
   return useMemo(() => {
     if (!owner || !file || !opts || !defaults) return null
