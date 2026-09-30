@@ -15,15 +15,16 @@ export function Rail({ day }: { day: Day }) {
   const tomorrow = addBusinessDays(day.today, 1)
   const back = day.returning.filter((r) => r.due === tomorrow)
   const later = day.returning.length - back.length
+  const done = day.done.filter((e) => e.outcome !== "skipped")
   return (
     <div className="flex flex-col gap-4">
       <Card className="gap-3 py-5">
         <h2 className="px-5 text-[15px] font-semibold text-foreground">{t("today.done.title")}</h2>
-        {day.done.length === 0 ? (
+        {done.length === 0 ? (
           <p className="px-5 text-sm text-muted-foreground">{t("today.done.empty")}</p>
         ) : (
           <ul className="flex flex-col px-3">
-            {day.done.map((e) => (
+            {done.map((e) => (
               <li key={e.id} className="flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-muted/60">
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-sm font-medium text-foreground">{e.doctor_name ?? e.doctor_id}</span>
