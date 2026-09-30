@@ -158,7 +158,9 @@ def pulse(t: dict, ser: dict, end: str, events_csv) -> dict:
     ev = []
     try:
         f = pd.read_csv(events_csv, dtype=str).dropna(subset=["date", "label"])
-        ev += [{"date": r.date, "label": r.label, "kind": getattr(r, "kind", "manual") or "manual"}
+        # optional label_es column; without it both languages show the label as written
+        es = lambda r: getattr(r, "label_es", None) if isinstance(getattr(r, "label_es", None), str) else r.label
+        ev += [{"date": r.date, "label": L(r.label, es(r)), "kind": getattr(r, "kind", "manual") or "manual"}
                for r in f.itertuples()]
     except FileNotFoundError:
         pass

@@ -106,9 +106,9 @@ def segments(seg: list[dict], dark=False, height=54):
     shades = [_rgba(p["bar"], 1), _rgba(p["bar"], .55), _rgba(p["alt"], .65), _rgba(p["alt"], 1)]
     fig = go.Figure()
     for i, s in enumerate(seg):
-        fig.add_trace(go.Bar(y=[""], x=[s["n"]], name=s["band"], orientation="h",
+        fig.add_trace(go.Bar(y=[""], x=[s["n"]], name=en(s["band"]), orientation="h",
                              marker=dict(color=shades[i % 4], line=dict(width=2, color=p["surface"])),
-                             hovertemplate=f"{s['band']}: %{{x:,.0f}} ({s['share']:.0%})<extra></extra>"))
+                             hovertemplate=f"{en(s['band'])}: %{{x:,.0f}} ({s['share']:.0%})<extra></extra>"))
     fig.update_layout(barmode="stack", height=height, margin=dict(l=0, r=0, t=0, b=0),
                       paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                       showlegend=False, xaxis=dict(visible=False), yaxis=dict(visible=False),

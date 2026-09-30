@@ -9,6 +9,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from i18n import L
+
 WATCH_TAGS = ["churn_threat", "discouraged", "complaint_no_patients", "complaint_noshow"]
 # The two signals with a churn lift worth acting on today (5.45x and 2.28x).
 # The complaint signals (1.43x) are real but weaker, and there are four times as
@@ -40,9 +42,12 @@ def ceiling(tagged: pd.DataFrame, doctors: pd.DataFrame) -> dict:
     caught = int(ch.doctor_id.isin(seen).sum())
     return {"churned_total": int(len(ch)), "with_warning": caught,
             "share": round(caught / max(len(ch), 1), 3),
-            "note": (f"{caught} of {len(ch)} churned doctors carried a churn-threat or discouraged "
-                     f"note before they left. This watchlist cannot see the other "
-                     f"{len(ch) - caught}. An empty watchlist is not good news.")}
+            "note": L(f"{caught} of {len(ch)} churned doctors carried a churn-threat or discouraged "
+                      f"note before they left. This watchlist cannot see the other "
+                      f"{len(ch) - caught}. An empty watchlist is not good news.",
+                      f"{caught} de {len(ch)} doctores que cancelaron tenían antes una nota de amenaza "
+                      f"de cancelación o de desánimo. Esta lista no ve a los otros {len(ch) - caught}. "
+                      "Una lista vacía no es buena noticia.")}
 
 
 def watchlist(doc: pd.DataFrame, leads: list[dict], asof: pd.Timestamp) -> list[dict]:
@@ -100,10 +105,15 @@ def day14(t: dict, doc: pd.DataFrame, asof: pd.Timestamp) -> dict:
             "evidence": evidence, "checkpoint_day": CHECKPOINT_DAY,
             "worklist": [], "worklist_size": 0,
             "live_cohort": False,
-            "note": ("No in-flight onboardings exist in this extract \u2014 all 5,526 closed on or "
-                     f"before {asof.date()}. In production this is a daily worklist. Here it is "
-                     "shown retrospectively: the rule is evaluated against onboardings that have "
-                     "already finished, which is what proves it works."),
+            # the count comes from the data (it was typed as 5,526 before)
+            "note": L(f"No in-flight onboardings exist in this extract \u2014 all {len(onb):,} closed on or "
+                      f"before {asof.date()}. In production this is a daily worklist. Here it is "
+                      "shown retrospectively: the rule is evaluated against onboardings that have "
+                      "already finished, which is what proves it works.",
+                      f"No hay onboardings en curso en estos datos: los {len(onb):,} cerraron a más tardar "
+                      f"el {asof.date()}. En producción es una lista diaria. Aquí se muestra en "
+                      "retrospectiva: la regla se prueba con onboardings ya terminados, y eso es lo "
+                      "que demuestra que funciona."),
             "retrospective": {
                 "failed_checkpoint": int(len(missed)),
                 "of_those_grade_d": int((missed.grade == "D").sum()),

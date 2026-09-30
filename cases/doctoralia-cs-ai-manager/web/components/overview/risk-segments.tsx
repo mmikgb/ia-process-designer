@@ -16,9 +16,9 @@ const COLOR: Record<string, string> = {
 }
 
 export function RiskSegments({ segments, scope = "all" }: { segments: SegmentItem[]; scope?: string }) {
-  const { t, num, pct } = useT()
+  const { t, tx, num, pct } = useT()
   const total = segments.reduce((a, s) => a + s.n, 0)
-  const name = (s: SegmentItem) => (s.key ? t(`band.${s.key}` as Key) : s.band)
+  const name = (s: SegmentItem) => (s.key ? t(`band.${s.key}` as Key) : tx(s.band))
   return (
     <Card>
       <CardHeader className="flex flex-col gap-1">
@@ -31,7 +31,7 @@ export function RiskSegments({ segments, scope = "all" }: { segments: SegmentIte
           <div className="flex h-4 w-full gap-1 overflow-hidden rounded-full">
             {segments.map((s) => (
               <div
-                key={s.key ?? s.band}
+                key={s.key ?? tx(s.band)}
                 className={cn("h-full first:rounded-l-full last:rounded-r-full", COLOR[s.key ?? ""] ?? "bg-muted-foreground")}
                 style={{ width: `${s.share * 100}%` }}
                 title={`${name(s)}: ${pct(s.share, 1)}`}
@@ -41,7 +41,7 @@ export function RiskSegments({ segments, scope = "all" }: { segments: SegmentIte
         </div>
         <ul className="grid grid-cols-2 gap-3">
           {segments.map((s) => (
-            <li key={s.key ?? s.band} className="flex flex-col gap-1 rounded-xl border border-border px-4 py-3">
+            <li key={s.key ?? tx(s.band)} className="flex flex-col gap-1 rounded-xl border border-border px-4 py-3">
               <span className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span className={cn("size-2.5 rounded-full", COLOR[s.key ?? ""] ?? "bg-muted-foreground")} aria-hidden />
                 {name(s)}

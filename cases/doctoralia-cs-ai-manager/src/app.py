@@ -160,7 +160,7 @@ if screen == "Overview":
             a.markdown(f"<div style='font-size:46px;font-weight:650;letter-spacing:-.03em;"
                        f"line-height:1.1;color:{PAL['ink']}'>{K['health_score']}</div>",
                        unsafe_allow_html=True)
-            bcol.caption(K["health_note"])
+            bcol.caption(en(K["health_note"]))
             w = pd.DataFrame(b["series"]["weekly"]["onboardings"])
             wk = [x[:10] for x in w.week]
             st.plotly_chart(V.area(wk, [("Activated (A/B)", w.activated.tolist()),
@@ -177,7 +177,7 @@ if screen == "Overview":
                             key="ov_seg")
             for sg, col in zip(K["segments"], [PAL["bar"], PAL["bar"], PAL["alt"], PAL["alt"]]):
                 c1, c2, c3 = st.columns([3, 2, 2])
-                c1.markdown(f"<span style='color:{col}'>●</span> {sg['band']}",
+                c1.markdown(f"<span style='color:{col}'>●</span> {en(sg['band'])}",
                             unsafe_allow_html=True)
                 c2.markdown(f"**{sg['n']:,}**")
                 c3.markdown(f"{sg['share']:.0%}")
@@ -197,7 +197,7 @@ if screen == "Overview":
         for a_ in K["attention"]:
             with st.container(border=True):
                 x, y, z = st.columns([5, 2, 2])
-                x.markdown(f"**{a_['label']}**")
+                x.markdown(f"**{en(a_['label'])}**")
                 x.caption(f"{a_['active']:,} active · {a_['doctors']:,} in total")
                 y.markdown(f"<div style='font-size:19px;font-weight:650;color:{PAL['ink']}'>"
                            f"{a_['lift']}×</div><div style='font-size:11px;color:{PAL['mut']}'>"
@@ -375,7 +375,7 @@ elif screen == "Watchlist":
     st.title("Watchlist")
     st.caption("Sorted by how long you have left, not by how bad it is.")
     cl = P["ceiling"]
-    st.error(f"**Ceiling: {cl['share']:.0%}.** {cl['note']}")
+    st.error(f"**Ceiling: {cl['share']:.0%}.** {en(cl['note'])}")
     lt = pd.DataFrame(P["lead_times"])
     st.subheader("How much warning each signal gives")
     st.dataframe(lt.rename(columns={"signal": "Signal", "n": "Churned doctors",
@@ -429,7 +429,7 @@ elif screen == "Watchlist":
                                     "grade_a": "Grade A", "grade_d": "Grade D", "churn": "Churn"}),
                  hide_index=True, width="stretch")
     if not d14.get("live_cohort", True):
-        st.info(d14["note"])
+        st.info(en(d14["note"]))
         r = d14["retrospective"]
         st.caption(f"Retrospectively: {r['failed_checkpoint']:,} onboardings failed the checkpoint "
                    f"and {r['grade_d_rate']:.1%} of them closed at grade D, against "

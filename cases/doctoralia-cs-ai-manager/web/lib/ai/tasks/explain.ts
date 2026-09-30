@@ -82,9 +82,10 @@ async function context(i: ExplainInput) {
     return { ...base, block: row ?? null, conversion_by_pickup: O.team.buckets, pickup_target_min: O.team.target_min, min_escalations: O.team.min_escalations }
   }
   const a = O.kpi.attention.find((x) => x.key === i.key)
+  const label = a && typeof a.label === "object" ? a.label[i.locale] : a?.label
   return {
     ...base,
-    block: a ?? null,
+    block: a ? { ...a, label } : null,
     baseline_churn: O.kpi.totals.churned / Math.max(O.kpi.totals.doctors, 1),
     lead_time: O.predict.lead_times.find((l) => l.signal === SIGNAL_LEAD[i.key]) ?? null,
   }

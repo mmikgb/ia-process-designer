@@ -17,17 +17,22 @@ BUCKETS = ["<30m", "30-60m", "60-120m", "120m+"]
 # The attention signals. One definition: the attention list sizes them, and bundle.py
 # tags every doctor with the keys they carry, so /doctores?signal=… lists the same people.
 ATTENTION = [
-    ("churn_threat", "Said they may cancel", lambda d: d.sig_churn_threat),
-    ("discouraged", "Discouraged with results", lambda d: d.sig_discouraged),
-    ("grade_d", "Closed onboarding at grade D", lambda d: d.onboarding_grade == "D"),
-    ("bottom_q", "Bottom quartile vs their peers", lambda d: d.bottom_quartile),
-    ("calendar_off", "Calendar never turned on", lambda d: ~d.calendar_enabled),
-    ("complaint", "Complained about volume or no-shows", lambda d: d.complaints >= 1),
+    ("churn_threat", L("Said they may cancel", "Dijo que cancelaría"), lambda d: d.sig_churn_threat),
+    ("discouraged", L("Discouraged with results", "Desanimado con los resultados"),
+     lambda d: d.sig_discouraged),
+    ("grade_d", L("Closed onboarding at grade D", "Cerró el onboarding con grado D"),
+     lambda d: d.onboarding_grade == "D"),
+    ("bottom_q", L("Bottom quartile vs their peers", "Cuartil bajo frente a sus pares"),
+     lambda d: d.bottom_quartile),
+    ("calendar_off", L("Calendar never turned on", "Nunca prendió su agenda"),
+     lambda d: ~d.calendar_enabled),
+    ("complaint", L("Complained about volume or no-shows", "Se quejó de volumen o inasistencias"),
+     lambda d: d.complaints >= 1),
 ]
 
 # The risk bands of the segments bar, [lo, hi). /doctores?risk_band=… uses the same cuts.
-RISK_BANDS = [("healthy", "Healthy", 0, .15), ("watch", "Watch", .15, .3),
-              ("at_risk", "At risk", .3, .5), ("critical", "Critical", .5, 1.01)]
+RISK_BANDS = [("healthy", L("Healthy", "Sana"), 0, .15), ("watch", L("Watch", "Vigilar"), .15, .3),
+              ("at_risk", L("At risk", "En riesgo"), .3, .5), ("critical", L("Critical", "Crítica"), .5, 1.01)]
 
 
 def attention_masks(doc: pd.DataFrame) -> dict[str, pd.Series]:
@@ -192,8 +197,10 @@ def build(t, doc, esc, ser, asof: pd.Timestamp, window: int = WINDOW, ctx: dict 
     return {
         "asof": str(asof.date()), "window_days": window,
         "health_score": round(health, 1),
-        "health_note": ("100 minus the mean risk score across active doctors. Every point traces "
-                        "to a rule in pipeline.py, so this number can be taken apart."),
+        "health_note": L("100 minus the mean risk score across active doctors. Every point traces "
+                         "to a rule in pipeline.py, so this number can be taken apart.",
+                         "100 menos el score de riesgo promedio de los doctores activos. Cada punto "
+                         "sale de una regla en pipeline.py, así que el número se puede desarmar."),
         "kpis": kpis, "attention": att, "segments": seg,
         "totals": {"active": int(len(active)), "churned": int((doc.status == "churned").sum()),
                    "specialists": int((pd.DataFrame(t["specialists"]).role == "Farming Specialist").sum()),

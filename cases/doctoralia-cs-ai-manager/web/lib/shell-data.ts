@@ -11,7 +11,7 @@ export interface ShellData {
   /** active doctors and doctors at risk per scope key ("all", "team:<name>", "S01"), last 30 days */
   books: Record<string, { active: number; atRisk: number }>
   plays: { key: string; mode: string; label: I18n }[]
-  ai: { enabled: boolean; reason: string }
+  ai: { enabled: boolean; reason: I18n | string }
 }
 
 export function shellData(o: OverviewData): ShellData {

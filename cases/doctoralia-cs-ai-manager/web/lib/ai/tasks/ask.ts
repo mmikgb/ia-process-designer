@@ -72,7 +72,7 @@ export async function screenContext(i: AskInput) {
   }
   if (i.screen === "equipo") return { ...base, team: O.team.rows.filter((r) => !mine || mine.has(r.id)), pickup_target_min: O.team.target_min }
   if (i.screen === "control") return { ...base, control_charts: spcSummary(O.meta.extract_date, i.locale) }
-  return { ...base, kpis: kpiBlock(i.scope, i.locale), attention: O.kpi.attention.map((a) => ({ key: a.key, label: a.label, active: a.active, churn: a.churn, lift: a.lift })) }
+  return { ...base, kpis: kpiBlock(i.scope, i.locale), attention: O.kpi.attention.map((a) => ({ key: a.key, label: typeof a.label === "object" ? a.label[i.locale] : a.label, active: a.active, churn: a.churn, lift: a.lift })) }
 }
 
 // ---- tools ----------------------------------------------------------------------------

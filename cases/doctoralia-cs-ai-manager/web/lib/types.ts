@@ -11,7 +11,7 @@ export interface Meta {
   plays?: { key: string; mode: "draft" | "brief" | "handoff"; label: I18n }[] // in PLAYS order
   web_schema?: number
   /** the segments bar's cuts, [lo, hi); /doctores?risk_band= uses the same */
-  risk_bands?: { key: string; label: string; lo: number; hi: number }[]
+  risk_bands?: { key: string; label: Text; lo: number; hi: number }[]
   flag_bits?: string[]
   signal_bits?: string[]
 }
@@ -32,7 +32,7 @@ export interface KpiItem {
 
 export interface AttentionItem {
   key: string
-  label: string
+  label: Text
   doctors: number
   active: number
   churn: number
@@ -41,7 +41,7 @@ export interface AttentionItem {
 
 export interface SegmentItem {
   key?: string // healthy | watch | at_risk | critical (meta.risk_bands)
-  band: string
+  band: Text
   n: number
   share: number
 }
@@ -170,14 +170,14 @@ export interface Day14Evidence {
 }
 
 export interface Predict {
-  ceiling: { churned_total: number; with_warning: number; share: number; note: string }
+  ceiling: { churned_total: number; with_warning: number; share: number; note: Text }
   lead_times: LeadTime[]
   day14: {
     evidence: Day14Evidence[]
     checkpoint_day: number
     worklist_size: number
     live_cohort: boolean
-    note: string
+    note: Text
     retrospective: {
       failed_checkpoint: number
       of_those_grade_d: number
@@ -220,7 +220,7 @@ export interface OverviewData {
 
 export interface Cost {
   enabled: boolean
-  reason: string
+  reason: Text
   estimate: {
     unique_notes_all: number
     unique_notes_untagged: number

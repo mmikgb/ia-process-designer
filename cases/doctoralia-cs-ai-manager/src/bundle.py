@@ -186,6 +186,19 @@ WEB_RULES = ["calendar_healthy_slots", "escalation_pickup_target_min", "peer_low
              "stale_contact_days", "extract_date", "min_n_rate", "followup_stale_days"]
 
 
+def _reason(r: str) -> dict:
+    """llm.enabled()'s reason, in both languages, for the web."""
+    if r == "ready":
+        return L("ready", "lista")
+    if r.startswith("AI features are switched off"):
+        return L(r, "la IA está apagada en la configuración")
+    if r.startswith("no API key"):
+        return L(r, "no hay llave de API configurada")
+    if r.startswith("monthly budget"):
+        return L(r, "se alcanzó el presupuesto del mes")
+    return L(r, r)
+
+
 def web_view(b: dict, top: int = 12) -> dict:
     """The slice of the bundle the Next.js app reads. Hundreds of KB, not 23 MB.
 
@@ -241,7 +254,7 @@ def web_view(b: dict, top: int = 12) -> dict:
         # ledger on the machine that makes the calls (out/llm_ledger.db), not here.
         "cost": {
             "enabled": b["llm"]["enabled"],
-            "reason": b["llm"]["reason"],
+            "reason": _reason(b["llm"]["reason"]),
             "estimate": b["llm"]["estimate"],
             "prices": llm.PRICES,
             "batch_discount": llm.BATCH_DISCOUNT,
