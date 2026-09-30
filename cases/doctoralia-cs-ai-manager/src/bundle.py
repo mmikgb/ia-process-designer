@@ -9,7 +9,7 @@ screens disagree, this file is the only place that could have caused it.
     python3 src/bundle.py --validate path/to.xlsx
 """
 from __future__ import annotations
-import argparse, hashlib, json, sys, time
+import argparse, hashlib, json, shutil, sys, time
 from datetime import datetime
 from pathlib import Path
 import numpy as np
@@ -290,6 +290,14 @@ def write_web_view(b: dict) -> Path:
                                                      separators=(",", ":")))
     p = OUT / "overview.json"
     p.write_text(json.dumps(web_view(b), ensure_ascii=False, separators=(",", ":")))
+    # Hand the same files to the web app when it sits next door, so a running
+    # `pnpm dev` hot-reloads after a rebuild: edit a rule, rebuild, the page moves.
+    web = ROOT / "web"
+    if web.is_dir():
+        (web / "data").mkdir(exist_ok=True)
+        shutil.copyfile(p, web / "data" / "overview.json")
+        shutil.rmtree(web / "public" / "doctors", ignore_errors=True)
+        shutil.copytree(dd, web / "public" / "doctors")
     return p
 
 
@@ -324,4 +332,5 @@ if __name__ == "__main__":
           f"${b['llm']['estimate']['total_usd']}")
     print(f"  bundle size {len(json.dumps(b))/1e6:.1f} MB -> out/app_data.json")
     wv = write_web_view(b)
-    print(f"  web view {wv.stat().st_size/1e3:.1f} KB -> out/overview.json")
+    print(f"  web view {wv.stat().st_size/1e3:.1f} KB -> out/overview.json"
+          + (" (and web/data)" if (ROOT / "web").is_dir() else ""))

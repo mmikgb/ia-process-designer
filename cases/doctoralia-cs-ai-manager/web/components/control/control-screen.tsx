@@ -25,8 +25,7 @@ const CHARTS: { key: string; fmt: Fmt; reading: string }[] = [
   {
     key: "pickup_weekly",
     fmt: minutes,
-    reading:
-      "Median minutes to pick up an escalation. The conversion finding rests on this: 54% convert when answered inside 30 minutes, 14% after two hours.",
+    reading: "Median minutes to pick up an escalation. The conversion finding rests on this metric.",
   },
   {
     key: "escalations_daily",
@@ -37,6 +36,13 @@ const CHARTS: { key: string; fmt: Fmt; reading: string }[] = [
 ]
 
 export function ControlScreen({ data }: { data: OverviewData }) {
+  // The pickup finding, quoted from the measured buckets rather than typed in.
+  const b = data.team.buckets
+  const finding =
+    b.length > 1
+      ? ` Escalations answered in ${b[0].bucket} convert at ${pct(b[0].converted)}; at ${b[b.length - 1].bucket}, ${pct(b[b.length - 1].converted)}.`
+      : ""
+  const charts = CHARTS.map((c) => (c.key === "pickup_weekly" ? { ...c, reading: c.reading + finding } : c))
   return (
     <>
       <section className="flex flex-col gap-3">
@@ -64,7 +70,7 @@ export function ControlScreen({ data }: { data: OverviewData }) {
       </section>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        {CHARTS.filter((c) => data.spc[c.key]).map((c) => (
+        {charts.filter((c) => data.spc[c.key]).map((c) => (
           <ControlChart key={c.key} chart={data.spc[c.key]} fmt={c.fmt} reading={c.reading} />
         ))}
       </div>

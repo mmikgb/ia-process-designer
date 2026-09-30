@@ -25,9 +25,21 @@ python3 src/bundle.py          # also writes out/overview.json
 cd web && pnpm install && pnpm dev    # http://localhost:3000
 ```
 
-Two screens: **Overview** (KPIs, attention, onboardings, the watchlist with its
-lead times, the 38% ceiling and the day-14 checkpoint) and **Control** (four
-control charts with a frozen baseline and labelled signal rules).
+Five screens:
+
+| Screen | Answers | Built from |
+|---|---|---|
+| **Overview** | Where to act: KPIs per portfolio and period, attention signals, onboardings, the watchlist with lead times, the 38% ceiling, the day-14 checkpoint. Click a doctor for the panel with the copilot draft | `kpi.scopes`, `forecast`, `draft.compose` |
+| **My team** | Where is the work and who needs help: each specialist's book, pickup and conversion when fast. Every count opens that list | `kpi.team` |
+| **Pulse** | What has been happening day by day, with a range brush and events from `config/events.csv` | `series.pulse` |
+| **Control** | Real change or noise: four control charts, frozen baseline, labelled rules | `spc` |
+| **Cost** | What the AI would cost, and that everything runs with it off | `llm`, `insight` |
+
+**Live change during the demo.** Keep `pnpm dev` running. Edit a threshold in `pipeline.py`
+(`calendar_healthy_slots` 6 → 8 moves "Agenda too thin" from 540 to 799; no doctor publishes
+2–5 slots, so 5 changes nothing) or a play in `draft.py`, run `python3 src/bundle.py`, and the
+page updates by itself — `bundle.py` writes straight into `web/data` and `web/public/doctors`.
+The cache key includes the code and the rules, so an edit always rebuilds.
 
 Controls: view as Manager / Specialist, portfolio (whole book, team, specialist),
 compare last 30 / 60 / 90 days, watchlist tier, signal, sort by lead time or risk,

@@ -21,6 +21,8 @@ def _kpi(key, label, value, prev, fmt="{:.0f}", good="up", spark=None, note=""):
 
 
 def build(t, doc, esc, ser, asof: pd.Timestamp, window: int = WINDOW) -> dict:
+    from pipeline import RULES  # labels quote the thresholds in force, not the ones at writing time
+    target, slots = RULES["escalation_pickup_target_min"], RULES["calendar_healthy_slots"]
     cur_a, cur_b = asof - pd.Timedelta(days=window), asof
     pre_a, pre_b = asof - pd.Timedelta(days=2 * window), cur_a
     active = doc[doc.status == "active"]
@@ -52,7 +54,7 @@ def build(t, doc, esc, ser, asof: pd.Timestamp, window: int = WINDOW) -> dict:
              note=f"{(active.risk_score >= .5).mean():.0%} of the active portfolio"),
         _kpi("may_cancel", "Said they may cancel", int(active.sig_churn_threat.sum()),
              None, "{:,.0f}", "down", note="36% of these churn, against 6.6% baseline"),
-        _kpi("sla", f"Escalations answered in 30 min",
+        _kpi("sla", f"Escalations answered in {target} min",
              e_cur.within_target.mean() if len(e_cur) else None,
              e_pre.within_target.mean() if len(e_pre) else None,
              "{:.0%}", "up", sp_sla, note=f"{len(e_cur)} escalations in the last {window} days"),
@@ -70,7 +72,7 @@ def build(t, doc, esc, ser, asof: pd.Timestamp, window: int = WINDOW) -> dict:
              (o_pre.grade == "D").mean() if len(o_pre) else None,
              "{:.1%}", "down", sp_d, note="17% of grade-D doctors churn, against 2% of A"),
         _kpi("hollow", "Agenda too thin", int(active.calendar_hollow.sum()), None,
-             "{:,.0f}", "down", note="calendar on, under 6 slots published"),
+             "{:,.0f}", "down", note=f"calendar on, under {slots} slots published"),
         _kpi("not_found", "Not being found", int(active.demand_constrained.sum()), None,
              "{:,.0f}", "down", note="plenty of slots, still below their peer median"),
     ]
