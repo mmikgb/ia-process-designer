@@ -163,6 +163,35 @@ def build(xlsx: Path | None = None, use_llm: bool = True, cache: bool = True) ->
     return b
 
 
+WATCH_FIELDS = ["doctor_id", "doctor_name", "specialty", "city", "owner_specialist_id",
+                "top_signal", "days_of_lead_left", "tier", "risk_score", "quote"]
+
+
+def web_view(b: dict, top: int = 12) -> dict:
+    """The slice of the bundle the Next.js overview reads. Kilobytes, not 23 MB."""
+    wl = b["predict"]["watchlist"]
+    tiers: dict[str, int] = {}
+    for w in wl:
+        tiers[w["tier"]] = tiers.get(w["tier"], 0) + 1
+    act = sorted((w for w in wl if w["tier"] == "act_now"),
+                 key=lambda w: (w["days_of_lead_left"], -w["risk_score"]))[:top]
+    return {
+        "meta": {k: b["meta"][k] for k in
+                 ["built_at", "source_file", "source_sha256_16", "extract_date"]},
+        "kpi": b["kpi"],
+        "weekly_onboardings": b["series"]["weekly"]["onboardings"],
+        "watchlist": {"tiers": tiers,
+                      "act_now_top": [{k: w[k] for k in WATCH_FIELDS} for w in act]},
+    }
+
+
+def write_web_view(b: dict) -> Path:
+    OUT.mkdir(exist_ok=True)
+    p = OUT / "overview.json"
+    p.write_text(json.dumps(web_view(b), ensure_ascii=False, indent=1))
+    return p
+
+
 def load_bundle(path: Path | None = None) -> dict:
     p = Path(path) if path else OUT / "app_data.json"
     if not p.exists():
@@ -193,3 +222,5 @@ if __name__ == "__main__":
     print(f"  llm: {b['llm']['reason']}   full enrichment would cost "
           f"${b['llm']['estimate']['total_usd']}")
     print(f"  bundle size {len(json.dumps(b))/1e6:.1f} MB -> out/app_data.json")
+    wv = write_web_view(b)
+    print(f"  web view {wv.stat().st_size/1e3:.1f} KB -> out/overview.json")
