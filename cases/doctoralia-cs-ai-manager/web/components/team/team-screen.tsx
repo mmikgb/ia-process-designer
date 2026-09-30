@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { formatPercent } from "@/lib/format"
 import { defaultFilters, loadFilters, saveFilters, type Filters } from "@/lib/controls"
+import { useIdentity } from "@/lib/identity"
 import type { OverviewData, TeamRow } from "@/lib/types"
 
 const pct = (v: number | null) => (v == null ? "—" : formatPercent(v, 0))
@@ -40,6 +41,7 @@ function PickupStrip({ values, max, target }: { values: (number | null)[]; max: 
 
 export function TeamScreen({ data }: { data: OverviewData }) {
   const router = useRouter()
+  const { setScope } = useIdentity()
   const { team } = data
   const [which, setWhich] = useState<string>("all")
   const rows = useMemo(() => team.rows.filter((r) => which === "all" || r.team === which), [team.rows, which])
@@ -60,7 +62,8 @@ export function TeamScreen({ data }: { data: OverviewData }) {
   const open = (r: TeamRow, patch: Partial<Filters>) => {
     const base = loadFilters(data) ?? defaultFilters(data)
     saveFilters({ ...base, role: "manager", scope: r.id, showHandled: false, ...patch })
-    router.push("/#worklist")
+    setScope(r.id)
+    router.push("/resumen#worklist")
   }
   const Count = ({ r, v, patch, label }: { r: TeamRow; v: number; patch: Partial<Filters>; label: string }) => (
     <button

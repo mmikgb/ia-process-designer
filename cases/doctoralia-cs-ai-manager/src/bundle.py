@@ -216,6 +216,8 @@ def web_view(b: dict, top: int = 12) -> dict:
         "periods": kpi.PERIODS,
         "specialists": sorted(people, key=lambda p: p["id"]),
         "teams": sorted({p["team"] for p in people}),
+        "managers": [{"team": t["team_name"], "name": t["manager_name"]} for t in b["teams"]
+                     if t["team_name"] in {p["team"] for p in people}],
         "scopes": b["scopes"],
         # Control charts are portfolio-wide by design: a 400-doctor book has too
         # few points a day to hold limits.

@@ -5,10 +5,10 @@ export interface Meta {
   source_file: string
   source_sha256_16: string
   extract_date: string
-  asof: string
-  queue_capacity: number
-  followup_quota: number
-  plays: { key: string; mode: "draft" | "brief" | "handoff"; label: I18n }[] // in PLAYS order
+  asof?: string
+  queue_capacity?: number
+  followup_quota?: number
+  plays?: { key: string; mode: "draft" | "brief" | "handoff"; label: I18n }[] // in PLAYS order
 }
 
 export interface KpiItem {
@@ -185,6 +185,7 @@ export interface OverviewData {
   periods: number[]
   specialists: Specialist[]
   teams: string[]
+  managers?: { team: string; name: string }[]
   scopes: Record<string, Scope>
   spc: Record<string, SpcChart>
   team: Team

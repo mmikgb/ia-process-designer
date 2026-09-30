@@ -20,6 +20,7 @@ import {
   type Filters,
   type Handled,
 } from "@/lib/controls"
+import { useIdentity } from "@/lib/identity"
 import type { OverviewData } from "@/lib/types"
 
 /**
@@ -28,7 +29,13 @@ import type { OverviewData } from "@/lib/types"
  * block to show and filters watchlist rows.
  */
 export function Dashboard({ data }: { data: OverviewData }) {
-  const [filters, setFilters] = useState<Filters>(() => defaultFilters(data))
+  const { who, scope: book, setScope } = useIdentity()
+  const [stored, setFilters] = useState<Filters>(() => defaultFilters(data))
+  // The book comes from the identity's context switcher; the role from who is looking.
+  const filters: Filters = useMemo(
+    () => ({ ...stored, scope: data.scopes[book] ? book : "all", role: who?.kind === "specialist" ? "specialist" : "manager" }),
+    [stored, book, who, data.scopes],
+  )
   const [handled, setHandled] = useState<Record<string, Handled>>({})
   // Fixed per page load so a snooze does not expire mid-render.
   const [now] = useState(() => new Date())
@@ -40,12 +47,13 @@ export function Dashboard({ data }: { data: OverviewData }) {
   }, [data])
 
   const onChange = useCallback((patch: Partial<Filters>) => {
+    if (patch.scope) setScope(patch.scope)
     setFilters((f) => {
       const next = { ...f, ...patch }
       saveFilters(next)
       return next
     })
-  }, [])
+  }, [setScope])
 
   const onHandle = useCallback((id: string, h: Handled | null) => {
     setHandled((prev) => {
