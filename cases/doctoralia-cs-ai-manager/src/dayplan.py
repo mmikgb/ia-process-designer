@@ -148,86 +148,130 @@ def _followup_live(r, rules, asof) -> bool:
 
 
 # --- the plan ----------------------------------------------------------------
-def build(doc: pd.DataFrame, watchlist: list[dict], rules: dict, asof,
-          copilot: dict | None = None, names: dict | None = None) -> dict[str, dict]:
-    """owner_id -> queue (see SPEC_Daily_Tool.md §5.1). `copilot` maps doctor_id to a
-    draft.compose() result when the caller already has them; otherwise they are composed.
-    `names` maps specialist_id to a name, for "Rafael agendó revisión…"."""
+def _due_reason(due) -> dict:
+    en_d, es_d = _d(due)
+    return L(f"due on {en_d}", f"vence el {es_d}")
+
+
+def classify(doc: pd.DataFrame, watchlist: list[dict], asof, copilot: dict | None = None,
+             names: dict | None = None) -> dict[str, list[dict]]:
+    """owner_id -> candidate items. Python decides here, once, which blocks each doctor can
+    occupy (`claims`, in priority order), the order inside each block (`ranks`) and the
+    reason for each. Capacity, the follow-up quota and the stale window are applied by
+    plan(), which the web mirrors so a specialist can change them live."""
     asof = pd.Timestamp(asof)
-    cap, quota, stale = (rules["daily_capacity"], rules["daily_followup_quota"],
-                         rules["followup_stale_days"])
     order = {p["key"]: i for i, p in enumerate(D.PLAYS)}
     wl = {w["doctor_id"]: w for w in watchlist}
-    active = doc[doc.status == "active"]
-
-    per_owner: dict[str, dict[str, list]] = {}
-    for _, r in active.iterrows():
+    per_owner: dict[str, list[dict]] = {}
+    for _, r in doc[doc.status == "active"].iterrows():
         res = (copilot or {}).get(r.doctor_id) or D.compose(r)
         play, mode = res["play"], res["mode"]
         w = wl.get(r.doctor_id)
+        owner = r.owner_specialist_id
         item = dict(doctor_id=r.doctor_id, doctor_name=r.doctor_name, specialty=r.specialty,
                     city=r.city, play=play, mode=mode, risk_score=float(r.risk_score),
-                    confident=bool(res["confident"]))
+                    confident=bool(res["confident"]), claims=[], reasons={}, _k={})
         if w:
             item.update(signal_at=w.get("signal_at"), lead_median=w.get("lead_median"),
                         days_of_lead_left=w.get("days_of_lead_left"))
         due = r.followup_due_at if pd.notna(getattr(r, "followup_due_at", None)) else None
-        late = (asof - pd.Timestamp(due)).days if due is not None else None
+
+        def claim(block, reason, key):
+            item["claims"].append(block)
+            item["reasons"][block] = reason
+            item["_k"][block] = key
+
+        if mode == "brief" and w and w.get("tier") == "act_now":
+            claim("call", call_reason(w), (w["days_of_lead_left"], -r.risk_score))
         if due is not None:
             item["due_at"] = str(pd.Timestamp(due).date())
-        blocks = per_owner.setdefault(r.owner_specialist_id, {b: [] for b in BLOCKS})
-        # sort keys live beside the item and are dropped before writing
-        if mode == "brief" and w and w.get("tier") == "act_now":
-            item.update(block="call", reason=call_reason(w),
-                        _k=(w["days_of_lead_left"], -r.risk_score))
-        elif late is not None and 0 <= late <= stale:
-            item.update(block="followup", reason=followup_reason(r, r.owner_specialist_id, names),
-                        _k=(pd.Timestamp(due), -r.risk_score))
-        elif mode == "draft" and res["confident"]:
-            item.update(block="message", reason=play_reason(r, play),
-                        _k=(order.get(play, 99), -r.risk_score,
-                            -(r.bookings_avg if pd.notna(r.bookings_avg) else 0)))
-        elif mode == "handoff":
+            claim("followup", followup_reason(r, owner, names), (pd.Timestamp(due), -r.risk_score))
+        if mode == "draft" and res["confident"]:
+            claim("message", play_reason(r, play),
+                  (order.get(play, 99), -r.risk_score,
+                   -(r.bookings_avg if pd.notna(r.bookings_avg) else 0)))
+        if mode == "handoff":
             up = getattr(r, "upsell_at", None)
-            item.update(block="handoff", reason=play_reason(r, play),
-                        _k=(-(pd.Timestamp(up).value if up is not None and pd.notna(up) else 0),))
-        else:
-            if mode == "brief":
-                why = "past_lead" if (w and w.get("tier") == "overdue") else "watch"
-                reason = call_reason(w) if w else play_reason(r, play)
-                later = LATER[why]
-            elif late is not None and late > stale:
-                reason, later = followup_reason(r, r.owner_specialist_id, names), _stale_reason(late, stale)
-            elif mode == "draft":
-                reason, later = play_reason(r, play), LATER["thin"]
-            else:
-                continue                    # nothing to do for this doctor
-            item.update(block="later", origin=None, reason=reason, later_reason=later,
-                        _k=(1, -r.risk_score))
-        blocks[item["block"]].append(item)
+            claim("handoff", play_reason(r, play),
+                  (-(pd.Timestamp(up).value if up is not None and pd.notna(up) else 0),))
+        # what "later" says when nothing above applies
+        if mode == "brief" and "call" not in item["claims"]:
+            item["later_kind"] = "past_lead" if (w and w.get("tier") == "overdue") else "watch"
+            item["reasons"]["later"] = call_reason(w) if w else play_reason(r, play)
+        elif mode == "draft" and not res["confident"]:
+            item["later_kind"] = "thin"
+            item["reasons"]["later"] = play_reason(r, play)
+        if not item["claims"] and "later_kind" not in item:
+            continue                        # nothing to do for this doctor
+        item["_k"]["later"] = (-r.risk_score,)
+        per_owner.setdefault(owner, []).append(item)
 
+    for items in per_owner.values():
+        for b in BLOCKS:
+            ranked = sorted((x for x in items if b in x["_k"]), key=lambda x: x["_k"][b])
+            for i, x in enumerate(ranked, 1):
+                x.setdefault("ranks", {})[b] = i
+        for x in items:
+            x.pop("_k")
+    return per_owner
+
+
+def plan(items: list[dict], asof, capacity: int, quota: int, window: int) -> list[dict]:
+    """The cut. For each candidate: the first claim that holds today (a follow-up holds when
+    it is due and at most `window` days late), then calls in full, follow-ups up to
+    `quota`, messages to fill `capacity`, handoffs, and everything else in "later".
+    Pure and deterministic: web/lib/dayplan.ts is a line-for-line copy."""
+    asof = pd.Timestamp(asof)
+    blocks: dict[str, list] = {b: [] for b in BLOCKS}
+    for x in items:
+        y = {k: v for k, v in x.items() if k not in ("block", "reason", "later_reason", "origin",
+                                                      "rank")}
+        late = (asof - pd.Timestamp(x["due_at"])).days if x.get("due_at") else None
+        held = [c for c in x["claims"] if c != "followup" or (late is not None and 0 <= late <= window)]
+        if held:
+            y.update(block=held[0], reason=x["reasons"][held[0]])
+        else:
+            y.update(block="later", origin=None)
+            if "later_kind" in x:
+                y.update(reason=x["reasons"]["later"], later_reason=LATER[x["later_kind"]])
+            elif late is not None and late > window:
+                y.update(reason=x["reasons"]["followup"], later_reason=_stale_reason(late, window))
+            else:                           # a follow-up that is not due yet
+                y.update(reason=x["reasons"]["followup"], later_reason=_due_reason(x["due_at"]))
+        blocks[y["block"]].append(y)
+    for b, v in blocks.items():
+        v.sort(key=lambda y: y["ranks"].get(b, 10**9))
+    call, fu, msg = blocks["call"], blocks["followup"], blocks["message"]
+    fu_today, fu_over = fu[:quota], fu[quota:]
+    room = max(capacity - len(call) - len(fu_today), 0)
+    msg_today, msg_over = msg[:room], msg[room:]
+    # Overflow keeps its place (follow-ups first, then messages in PLAYS order) and
+    # comes back on the next day it fits.
+    over = [dict(y, block="later", origin=y["block"], later_reason=LATER["capacity"])
+            for y in fu_over + msg_over]
+    out = call + fu_today + msg_today + blocks["handoff"] + over + blocks["later"]
+    for i, y in enumerate(out, 1):
+        y["rank"] = i
+    return out
+
+
+def build(doc: pd.DataFrame, watchlist: list[dict], rules: dict, asof,
+          copilot: dict | None = None, names: dict | None = None) -> dict[str, dict]:
+    """owner_id -> queue (SPEC §5.1), cut with the RULES defaults. Each item also carries
+    `claims`, `ranks` and `reasons` so the web can re-cut with the specialist's own
+    capacity, quota and window, and as the app's day moves forward."""
+    asof = pd.Timestamp(asof)
+    cap, quota, stale = (rules["daily_capacity"], rules["daily_followup_quota"],
+                         rules["followup_stale_days"])
     out = {}
-    for owner, blocks in sorted(per_owner.items()):
-        for b in blocks.values():
-            b.sort(key=lambda x: x["_k"])
-        counts = {b: len(v) for b, v in blocks.items()}
-        call, fu, msg = blocks["call"], blocks["followup"], blocks["message"]
-        fu_today, fu_over = fu[:quota], fu[quota:]
-        room = max(cap - len(call) - len(fu_today), 0)
-        msg_today, msg_over = msg[:room], msg[room:]
-        # Overflow keeps its place: follow-ups first, then messages in PLAYS order, and
-        # comes back on the next day it fits.
-        over = [dict(x, block="later", origin=x["block"], later_reason=LATER["capacity"],
-                     _k=(0,) + x["_k"]) for x in fu_over + msg_over]
-        later = over + blocks["later"]
-        items = call + fu_today + msg_today + blocks["handoff"] + later
-        for i, x in enumerate(items, 1):
-            x["rank"] = i
-            x.pop("_k", None)
-            if x["block"] != "later":
-                x.pop("origin", None)
+    for owner, items in sorted(classify(doc, watchlist, asof, copilot, names).items()):
+        planned = plan(items, asof, cap, quota, stale)
+        counts = {b: 0 for b in BLOCKS}           # before capacity is applied
+        for y in planned:
+            counts[y.get("origin") or y["block"]] += 1
         out[owner] = {"owner": owner, "asof": str(asof.date()), "capacity": cap,
-                      "followup_quota": quota, "counts": counts, "items": items}
+                      "followup_quota": quota, "followup_stale_days": stale,
+                      "counts": counts, "items": planned}
     return out
 
 

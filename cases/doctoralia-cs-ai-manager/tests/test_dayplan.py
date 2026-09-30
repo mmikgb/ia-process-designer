@@ -139,3 +139,47 @@ def test_churned_doctors_have_no_flags(data):
     doc = data[0]
     for _, r in doc[doc.status == "churned"].head(50).iterrows():
         assert dayplan.flags(r, RULES, ASOF) == []
+
+
+# --- the cut is dynamic: capacity, quota and window can change without a rebuild ---
+@pytest.fixture(scope="module")
+def candidates(data):
+    doc, wl, copilot = data
+    return dayplan.classify(doc, wl, ASOF, copilot)
+
+
+def test_defaults_reproduce_the_file(candidates, queues):
+    for owner, items in candidates.items():
+        p = dayplan.plan(items, ASOF, RULES["daily_capacity"], RULES["daily_followup_quota"],
+                         RULES["followup_stale_days"])
+        assert [(y["doctor_id"], y["block"]) for y in p] == \
+               [(x["doctor_id"], x["block"]) for x in queues[owner]["items"]]
+
+
+def test_capacity_and_quota_move_the_cut(candidates):
+    items = candidates["S01"]
+    small = dayplan.plan(items, ASOF, 10, 2, 14)
+    big = dayplan.plan(items, ASOF, 40, 12, 14)
+    n = lambda p, b: sum(y["block"] == b for y in p)
+    assert n(small, "followup") == 2 and n(big, "followup") == 12
+    assert n(small, "call") == n(big, "call")            # calls are never cut
+    assert n(big, "message") > n(small, "message")
+
+
+def test_window_brings_stale_followups_back(candidates):
+    items = candidates["S01"]
+    n = lambda p: sum(y["block"] == "followup" or y.get("origin") == "followup" for y in p)
+    assert n(dayplan.plan(items, ASOF, 20, 8, 60)) > n(dayplan.plan(items, ASOF, 20, 8, 14))
+
+
+def test_moving_the_day_brings_upcoming_followups_in(candidates):
+    moved_in = 0
+    for items in candidates.values():
+        future = [x for x in items if x.get("due_at") and pd.Timestamp(x["due_at"]) > ASOF
+                  and "call" not in x["claims"]]
+        for x in future[:3]:
+            day = pd.Timestamp(x["due_at"])
+            y = next(y for y in dayplan.plan(items, day, 20, 8, 14) if y["doctor_id"] == x["doctor_id"])
+            assert y["block"] == "followup" or y.get("origin") == "followup", y
+            moved_in += 1
+    assert moved_in

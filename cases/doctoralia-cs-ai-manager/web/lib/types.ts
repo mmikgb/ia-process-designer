@@ -292,12 +292,19 @@ export interface QueueItem {
   confident: boolean
   later_reason?: I18n // why it is not in today's plan
   origin?: "followup" | "message" | null // later items pushed out by capacity: the block they came from
+  // For the live re-cut (lib/dayplan.ts mirrors src/dayplan.py plan()): the blocks this
+  // doctor can occupy in priority order, the order inside each, and the line for each.
+  claims: Exclude<Block, "later">[]
+  ranks: Partial<Record<Block, number>>
+  reasons: Partial<Record<Block, I18n>>
+  later_kind?: "past_lead" | "watch" | "thin"
 }
 export interface QueueFile {
   owner: string
   asof: string
   capacity: number
   followup_quota: number
+  followup_stale_days: number
   counts: Record<Block, number> // before capacity is applied
   items: QueueItem[] // ordered: call, followup, message, handoff, later
 }

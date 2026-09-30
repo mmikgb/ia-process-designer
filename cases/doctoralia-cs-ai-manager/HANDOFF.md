@@ -419,3 +419,16 @@ first. Order to use: `pipeline.py` → `bundle.py` → `analysis.py`.
   per-owner history files loaded on the Historial tab (same total, faster panel), (c) raise
   the cap.
 - `tests/test_bundle_web.py`: 4 tests on the files against §5.
+
+### Miguel's answers at the Phase 1 pause (2026-09-30)
+
+- **Capacity, quota and window are dynamic.** `RULES` keeps the defaults (20 / 8 / 14);
+  a specialist can change them live on Hoy. `dayplan.py` is split in two: `classify()`
+  decides in Python which blocks each doctor can occupy (`claims`), the order inside each
+  (`ranks`) and the reason for each; `plan()` is the cut (capacity, quota, window, app day).
+  The queue files carry both, cut with the defaults; `web/lib/dayplan.ts` (Phase 3) will be a
+  line-for-line copy of `plan()`. The same split lets "Avanzar un día" bring follow-ups in
+  as they come due. Follow-ups not yet due now appear in `later` as "vence el …".
+- **Size does not matter**: web/public at ~24 MB is accepted; no further cuts.
+- **The dataset is synthetic** (invented for the case) and is committed at
+  `data/dataset.xlsx`, so a clean clone builds.
