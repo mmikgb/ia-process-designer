@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 
 const LINKS = [
   { href: "/", label: "Overview", hint: "Where to act" },
+  { href: "/team", label: "My team", hint: "Where is the work, who needs help?" },
   { href: "/control", label: "Control", hint: "Real change or noise?" },
 ]
 

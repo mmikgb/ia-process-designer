@@ -179,6 +179,7 @@ export interface OverviewData {
   teams: string[]
   scopes: Record<string, Scope>
   spc: Record<string, SpcChart>
+  team: Team
   predict: Predict
   watchlist: Watchlist
 }
@@ -223,4 +224,32 @@ export interface Dossier {
     confidence: number
     gaps: string[]
   }
+}
+
+export interface TeamRow {
+  id: string
+  name: string
+  team: string
+  portfolio: number
+  at_risk: number
+  at_risk_share: number | null
+  may_cancel: number
+  hollow: number
+  not_found: number
+  open_commitments: number
+  escalations: number
+  median_pickup: number | null
+  within_target: number | null
+  converted: number | null
+  converted_when_fast: number | null
+  pickup_weeks: (number | null)[]
+}
+
+export interface Team {
+  rows: TeamRow[]
+  weeks: string[]
+  buckets: { bucket: string; n: number; converted: number }[]
+  target_min: number
+  min_escalations: number
+  unowned: { n: number; by_queue: Record<string, number> }
 }

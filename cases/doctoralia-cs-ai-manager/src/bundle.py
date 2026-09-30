@@ -156,6 +156,7 @@ def build(xlsx: Path | None = None, use_llm: bool = True, cache: bool = True) ->
         "spc": spc.build(t, ser),
         "kpi": kpi.build(t, doc, esc, ser, asof),
         "scopes": kpi.scopes(t, doc, esc, asof),
+        "team": kpi.team(t, doc, esc, asof),
         "predict": forecast.build(t, doc, tagged, ser, asof),
         "insights": insight.build(t, doc, tagged, use_llm=use_llm),
         "llm": {"enabled": llm.enabled()[0], "reason": llm.enabled()[1],
@@ -211,6 +212,7 @@ def web_view(b: dict, top: int = 12) -> dict:
         # Control charts are portfolio-wide by design: a 400-doctor book has too
         # few points a day to hold limits.
         "spc": b["spc"],
+        "team": b["team"],
         "predict": {
             "ceiling": b["predict"]["ceiling"],
             "lead_times": b["predict"]["lead_times"],

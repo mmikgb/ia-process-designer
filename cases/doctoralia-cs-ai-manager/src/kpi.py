@@ -162,3 +162,64 @@ def scopes(t, doc, esc, asof: pd.Timestamp) -> dict:
             per[str(w)] = k
         out[key] = {"periods": per, "weekly_onboardings": ser["weekly"]["onboardings"]}
     return out
+
+
+# ---- the manager's team view ----------------------------------------------
+
+MIN_ESC = 10   # below this, a specialist gets a count and no percentage
+
+
+def team(t, doc, esc, asof: pd.Timestamp) -> dict:
+    """One row per farming specialist: the work in their book and how their
+    escalations were handled. Deliberately no conversion ranking: inside the
+    30-minute bucket everyone converts about the same, so a raw conversion
+    column measures the queue, not the person."""
+    from pipeline import RULES
+    sp = t["specialists"].merge(t["teams"], on="team_id")
+    farm = sp[sp.role == "Farming Specialist"].sort_values("specialist_id")
+    active = doc[doc.status == "active"]
+    e = esc[esc.is_person].copy() if "is_person" in esc else esc.copy()
+    e["week"] = pd.to_datetime(e.escalated_at).dt.to_period("W").dt.start_time
+    weeks = sorted(e.week.unique())[-12:]
+
+    rows = []
+    for _, s in farm.iterrows():
+        p = active[active.owner_specialist_id == s.specialist_id]
+        x = e[e.specialist_id == s.specialist_id]
+        enough = len(x) >= MIN_ESC
+        wk = x.groupby("week").minutes_to_pickup.median()
+        rows.append({
+            "id": s.specialist_id, "name": s.specialist_name, "team": s.team_name,
+            "portfolio": int(len(p)),
+            "at_risk": int((p.risk_score >= .5).sum()),
+            "at_risk_share": round(float((p.risk_score >= .5).mean()), 4) if len(p) else None,
+            "may_cancel": int(p.sig_churn_threat.sum()),
+            "hollow": int(p.calendar_hollow.sum()),
+            "not_found": int(p.demand_constrained.sum()),
+            "open_commitments": int(p.commitment_open.sum()),
+            "escalations": int(len(x)),
+            "median_pickup": None if not len(x) else round(float(x.minutes_to_pickup.median()), 1),
+            "within_target": round(float(x.within_target.mean()), 4) if enough else None,
+            "converted": round(float(x.converted.mean()), 4) if enough else None,
+            "converted_when_fast": (round(float(x[x.within_target].converted.mean()), 4)
+                                    if enough and x.within_target.any() else None),
+            # same 12 weeks for everyone, so the strip shares one axis
+            "pickup_weeks": [None if w not in wk.index else round(float(wk[w]), 1) for w in weeks],
+        })
+
+    buckets = []
+    for bk in ["<30m", "30-60m", "60-120m", "120m+"]:
+        m = e[e.pickup_bucket == bk]
+        if len(m) >= MIN_ESC:
+            buckets.append({"bucket": bk, "n": int(len(m)), "converted": round(float(m.converted.mean()), 4)})
+
+    nobody = esc[~esc.is_person] if "is_person" in esc else esc.iloc[0:0]
+    return {
+        "rows": rows,
+        "weeks": [str(pd.Timestamp(w).date()) for w in weeks],
+        "buckets": buckets,
+        "target_min": RULES["escalation_pickup_target_min"],
+        "min_escalations": MIN_ESC,
+        "unowned": {"n": int(len(nobody)),
+                    "by_queue": {str(k): int(v) for k, v in nobody.specialist_id.value_counts().items()}},
+    }
