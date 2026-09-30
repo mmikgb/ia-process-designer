@@ -45,21 +45,27 @@ def call_reason(w: dict) -> dict:
              f"Dijo que cancelaría hace {e} días; suelen irse a los {lead}")
 
 
+# (owner EN, owner ES, someone else EN, someone else ES); {who} and {d} are filled in
 FOLLOWUP_WORDS = {
-    "review": ("a review", "revisión"),
-    "reschedule": ("a new try", "reagendar"),
-    "retry": ("a retry", "reintentar"),
-    "weekday": ("a follow-up", "seguimiento"),
+    "review": ("You scheduled a review for {d}", "Agendaste revisión para el {d}",
+               "{who} scheduled a review for {d}", "{who} agendó revisión para el {d}"),
+    "reschedule": ("You rescheduled for {d}", "Reagendaste para el {d}",
+                   "{who} rescheduled for {d}", "{who} reagendó para el {d}"),
+    "retry": ("You planned a retry for {d}", "Quedaste de reintentar el {d}",
+              "{who} planned a retry for {d}", "{who} quedó de reintentar el {d}"),
+    "weekday": ("You scheduled a follow-up for {d}", "Agendaste seguimiento para el {d}",
+                "{who} scheduled a follow-up for {d}", "{who} agendó seguimiento para el {d}"),
 }
 
 
 def followup_reason(r, owner: str, names: dict | None = None) -> dict:
     en_d, es_d = _d(r.followup_due_at)
-    w_en, w_es = FOLLOWUP_WORDS.get(r.followup_kind, FOLLOWUP_WORDS["weekday"])
+    mine_en, mine_es, other_en, other_es = FOLLOWUP_WORDS.get(r.followup_kind,
+                                                              FOLLOWUP_WORDS["weekday"])
     if r.followup_set_by == owner:
-        return L(f"You scheduled {w_en} for {en_d}", f"Agendaste {w_es} para el {es_d}")
+        return L(mine_en.format(d=en_d), mine_es.format(d=es_d))
     who = str((names or {}).get(r.followup_set_by, r.followup_set_by)).split()[0]
-    return L(f"{who} scheduled {w_en} for {en_d}", f"{who} agendó {w_es} para el {es_d}")
+    return L(other_en.format(who=who, d=en_d), other_es.format(who=who, d=es_d))
 
 
 def play_reason(r, play: str | None) -> dict:
