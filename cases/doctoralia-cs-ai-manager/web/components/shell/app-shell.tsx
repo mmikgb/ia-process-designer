@@ -7,6 +7,7 @@ import { WhoDialog } from "@/components/shell/who-dialog"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { useT } from "@/lib/i18n"
+import { ClockProvider } from "@/lib/clock"
 import { IdentityProvider } from "@/lib/identity"
 import { ShellDataProvider, type ShellData } from "@/lib/shell"
 
@@ -15,6 +16,7 @@ export function AppShell({ data, children }: { data: ShellData; children: React.
   return (
     <ShellDataProvider value={data}>
       <IdentityProvider>
+        <ClockProvider>
         <TooltipProvider>
           <div className="flex min-h-dvh bg-background">
             <aside className="sticky top-0 hidden h-dvh w-[76px] shrink-0 overflow-y-auto border-r border-sidebar-border bg-sidebar md:block lg:w-[248px]">
@@ -26,6 +28,7 @@ export function AppShell({ data, children }: { data: ShellData; children: React.
           <ShellEvents />
           <Toaster position="bottom-right" />
         </TooltipProvider>
+        </ClockProvider>
       </IdentityProvider>
     </ShellDataProvider>
   )
