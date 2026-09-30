@@ -432,3 +432,40 @@ first. Order to use: `pipeline.py` → `bundle.py` → `analysis.py`.
 - **Size does not matter**: web/public at ~24 MB is accepted; no further cuts.
 - **The dataset is synthetic** (invented for the case) and is committed at
   `data/dataset.xlsx`, so a clean clone builds.
+
+### Phase 2: shell, design system, language, identity
+
+- **T2.1** Tokens after the references: page `#f5f2ef`, white cards with a 1px `#e9e3dc` border
+  and a soft shadow, 14px radius, 24px card padding; chip tints for green, amber, red, blue,
+  violet, each checked ≥ 4.5:1 in light and dark. Brand primary, ink and the validated chart
+  colours unchanged.
+- **T2.2** App shell under `app/(shell)/`: sidebar (248px; icons only 768–1023px; a sheet
+  below 768px) with the context switcher, nav in role order, the "Pregúntale a tu cartera"
+  card (⌘J; the drawer is phase 4, until then a toast says so), AI status, ES/EN, theme and the
+  user card; top bar with greeting, subtitle, search (⌘K), clock chip and follow-up bell.
+  Routes: `/hoy`, `/doctores`, `/senales` (phase 5), `/resumen` (the old overview),
+  `/equipo`, `/pulse`, `/control`, `/costo`; `/team`, `/cost` and `/overview` redirect.
+  The UI primitives (dialog, sheet, dropdown-menu, popover, kbd, avatar, skeleton, sonner)
+  are hand-written on `@base-ui/react`; the shadcn registry is blocked from this container.
+  The shell gets a slim `ShellData` (built server-side), not the whole overview.
+- **T2.3** i18n: `lib/i18n/{es,en}.ts` (flat keys, EN typed from ES), `I18nProvider`,
+  `useT()` with `t`, `tx`, `num`, `pct`, `day`, `dayLong` over `Intl` (es-MX / en-US).
+  `scripts/check-i18n.mjs` runs in `prebuild` (checked failing on a missing key).
+  **Not yet:** the strings inside the existing screens (Resumen, Mi equipo, Pulse, Control,
+  Costo, the doctor panel) are still English; they are rewritten in phases 3 and 5 and
+  go through `t()` then. The shell and every new component are bilingual.
+- **T2.4** Identity: "¿Quién eres?" (14 specialists by team, 3 managers, Dirección CS),
+  `cs:who`; `/` → `/hoy` or `/resumen`; the user card switches identity. The View-as switch
+  and the portfolio select are gone from Resumen; managers change book in the context
+  switcher. Measured in Chromium: first visit 1 click (763 ms to /hoy), return visit 0 clicks.
+- **T2.5** Clock: `lib/clock.tsx` `appToday()`, `CS_CLOCK=snapshot|real` (via
+  `NEXT_PUBLIC_CS_CLOCK`), "Avanzar un día" moves to the **next working day** (from Friday 25
+  to Monday 28, not Saturday), "Volver al 25 sep"; persists in `cs:dayOffset`.
+  The bell still counts the file's follow-ups; it follows the moved day once phase 3 ports
+  `plan()` to the web.
+- **T2.6** ⌘K palette: cmdk over `search.json` (loaded on first open) with an
+  accent-insensitive filter (own book first); screens; actions.
+- **T2.7** `?doctor=ID` opens the doctor sheet on any screen (one host in the shell); the
+  Resumen worklist and the palette push it, so back closes and forward reopens (checked).
+  Done/snooze is a shared store (`lib/handled.ts`).
+- Checked at 390, 900, 1440 px: no horizontal scroll; no console errors.
