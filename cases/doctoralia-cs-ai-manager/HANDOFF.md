@@ -610,3 +610,51 @@ first. Order to use: `pipeline.py` → `bundle.py` → `analysis.py`.
 - **For Miguel to decide:** the flag "En riesgo" is risk ≥ 0.5, which the segments bar calls
   "Crítica"; the band "En riesgo" is 0.3–0.5. Both names come from the existing Python and I left
   them. The simplest fix is to rename the flag "Riesgo crítico" (or the band "Riesgo medio").
+
+### Phase 6: verification and rehearsal
+
+**T6.1** (all run on 2026-09-30, Linux container):
+- `pytest tests/`: 66 passed (includes the Streamlit AppTest: 12 screens, both roles, no exception).
+- `python3 src/pipeline.py` then `python3 src/analysis.py`: exit 0 (7 s each).
+- `pnpm typecheck`, `pnpm build`, `pnpm test` (20 passed).
+- `pnpm e2e` (no key) and `CS_AI_MOCK=1 pnpm e2e`: **18 passed each**, at 1440 light (every spec)
+  and 390 dark (`smoke.spec.ts`: every screen, both roles, both languages, no page error, no
+  sideways scroll). The 390 sweep found two layout bugs, fixed in T6.1.
+- **G2**: fresh browser → first action in **2 clicks, 834 ms**; → a sendable draft in **3 clicks,
+  846 ms** (limits 3 and 4 clicks, 30 s).
+
+**T6.2 Rehearsal script.** Steps 1–4 and 7–10 are `e2e/rehearsal.spec.ts`; steps 5–6 are
+`scripts/rehearse_live.py` (it edits, rebuilds, measures, restores, and checks the bundle comes
+back byte-identical). Both ran twice; the browser part ran twice with no key and twice with
+`CS_AI_MOCK=1`: all passed.
+
+1. Fresh browser → pick **Rafael Sandoval** → `/hoy` shows "Tu día" (the briefing) and **0 de 20**.
+2. **Empezar** → the first item is a call brief (dijo que cancelaría) → **Generar guion** →
+   `A` → "Acordamos…" → pick Friday 2 Oct → **Guardar**.
+3. Walk (→) to the first draft → **Email** · **más formal** → **Reescribir con IA** → the diff →
+   `E` (enviado). *Code differs from the spec:* Rafael's day has no hollow-calendar draft; all six
+   of his messages today are `open_commitment` (see step 5).
+4. Open that doctor (`/hoy?doctor=…`) → **Análisis IA** → **Ver contexto** shows the JSON the
+   model received.
+5. Live change 1. *The spec's change (move `visibility` above `hollow_calendar` in `PLAYS`)
+   changes nothing, by construction:* `hollow_calendar` needs fewer than 6 slots and `visibility`
+   plenty of slots, so no doctor qualifies for both. **Use instead: move `hollow_calendar` above
+   `open_commitment`** → `python3 src/bundle.py` → today's 111 messages across the team go from
+   `open_commitment` to `hollow_calendar`, and Rafael's Mensajes block changes on the open page
+   (`pnpm dev` reloads it).
+6. Live change 2: `calendar_healthy_slots` 6 → 8 → agenda too thin **540 → 799**, not being
+   found **584 → 546**, messages before the cut **2,407 → 2,564**, handoffs 922 → 850.
+7. `/costo` → kill switch off → Hoy says **IA apagada** and every AI surface shows "Versión
+   automática"; nothing breaks. Switch back on.
+8. Mark one **Sin respuesta** (`S`), **Avanzar un día** twice → it is back under Seguimientos.
+   *Code differs from the spec:* no answer returns in **2** working days (T3.3), so from Friday it
+   takes two advances, not one.
+9. Switch to **Norma Trejo (Norte)** → `/resumen` → "Qué pasó esta semana" → **Explícame** on
+   Tasa de grado D answers from the control chart → click a count (Dijeron que cancelarían) →
+   `/doctores` shows that many doctors.
+10. **EN** → the same screen in English; a draft to a doctor is still Spanish (usted).
+
+Found while rehearsing, not a product bug: restoring an edited `.py` within the same second and
+with the same size can make Python reuse the edited file's `.pyc` (it checks mtime to the second
+and size), so the "restored" rebuild still showed the edit. The script now builds with `-B` and
+clears `src/__pycache__`. A hand edit in a live demo will not hit this.
