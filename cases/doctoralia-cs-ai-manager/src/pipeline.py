@@ -37,6 +37,11 @@ RULES = {
     "campaign_fatigue_n": 3,          # campaigns in 60 days past which we stop enrolling
     "peer_low_percentile": 0.25,      # bottom quartile of their specialty is a signal
     "meaningful_peer_gap": 2.0,       # bookings/month below peers before we say so out loud
+    # The specialist's day (dayplan.py). Calls are never cut; follow-ups take up to the
+    # quota; messages fill the rest of the capacity. Handoffs do not count (one click).
+    "daily_capacity": 20,             # README's cost assumes 15 messages a day; calls take longer
+    "daily_followup_quota": 8,        # without it the follow-up backlog fills the whole day
+    "followup_stale_days": 14,        # a follow-up overdue by more than this goes to "later"
     "extract_date": "2026-09-25",
 }
 

@@ -345,3 +345,29 @@ first. Order to use: `pipeline.py` → `bundle.py` → `analysis.py`.
   mention scheduling but match no rule. Almost all are the bare "Reagendar." after an
   onboarding no-show, which carries no date.
 - `tests/test_notes.py`: 14 tests.
+
+### T1.5 `src/dayplan.py`: the day, per owner
+
+- `build(doc, watchlist, rules, asof, copilot=None, names=None)`: blocks
+  call → followup → message → handoff → later, one block per doctor. New rules in `RULES`:
+  `daily_capacity` 20, `daily_followup_quota` 8, `followup_stale_days` 14.
+- Decisions the spec left open:
+  - Brief-mode doctors that are not `act_now` go to `later`: "past the usual warning time"
+    when the watchlist tier is `overdue`, "weaker signal, not a call for today" otherwise.
+  - Active doctors whose play is a draft but whose evidence is below the confidence floor go
+    to `later` ("evidence too thin to draft"), not into Messages.
+  - Doctors with no play and no follow-up are not in the queue at all.
+  - Capacity overflow keeps its order (follow-ups first, then messages in PLAYS order) and
+    carries `origin` ("followup" | "message") so the web can bring it back when there is room.
+    `origin` is an addition to the §5.1 contract.
+  - A follow-up keeps the doctor's play, which can be `null` (nothing else wrong) or a handoff.
+  - Reasons name who scheduled a follow-up: "Agendaste…" for the owner, "Damián agendó…"
+    otherwise (the note's author is not always the owner).
+- Sizes per specialist at the extract date (before capacity): calls 0–8 (57 in total, exactly
+  the `act_now` rows in brief mode), follow-ups in the 14-day window 25–55, confident drafts
+  157–195, handoffs 47–75, briefs past their lead time 9–24. Today's plan per specialist:
+  every call, 8 follow-ups, messages to fill 20.
+- `flags()` per active doctor; churned get `[]`. Counts per owner equal `kpi.team` rows for
+  hollow, not_found, open_commitments, may_cancel and at_risk (tested).
+- `tests/test_dayplan.py`: 10 tests, including every check the spec lists; the PLAYS reorder
+  test uses unlimited capacity so the reorder is visible in the full candidate list.
