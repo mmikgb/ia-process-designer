@@ -21,14 +21,24 @@ OUT = ROOT / "out"
 LEDGER = OUT / "llm_ledger.db"
 SETTINGS = OUT / "settings.json"
 
-# $ per million tokens. Source: platform.claude.com/docs/en/about-claude/pricing
-# (checked 2026-09-30; batch is 50% of these)
+# $ per million tokens. Source: platform.claude.com/docs/en/about-claude/pricing and
+# /about-claude/models/overview (checked 2026-09-30; batch is 50% of these).
+# The 4.5-generation rows stay so old ledger rows keep their price; claude-sonnet-4-5 is
+# on the deprecation schedule (retirement not sooner than 2026-09-29).
 PRICES = {
-    "claude-haiku-4-5":  {"in": 1.0, "out": 5.0},
-    "claude-sonnet-4-5": {"in": 3.0, "out": 15.0},
-    "claude-opus-4-5":   {"in": 5.0, "out": 25.0},
+    "claude-haiku-4-5-20251001": {"in": 1.0, "out": 5.0},
+    "claude-sonnet-5-5":         {"in": 2.0, "out": 10.0},
+    "claude-opus-5-5":           {"in": 4.0, "out": 20.0},
+    "claude-haiku-4-5":          {"in": 1.0, "out": 5.0},
+    "claude-sonnet-4-5":         {"in": 3.0, "out": 15.0},
+    "claude-opus-4-5":           {"in": 5.0, "out": 25.0},
 }
-DEFAULT_MODEL = "claude-haiku-4-5"
+MODEL_FAST = "claude-haiku-4-5-20251001"   # summaries, polish, ask
+MODEL_DEEP = "claude-sonnet-5-5"           # themes
+DEFAULT_MODEL = MODEL_FAST
+# A model saved in out/settings.json before the move keeps working as its successor.
+REPLACED = {"claude-sonnet-4-5": MODEL_DEEP, "claude-haiku-4-5": MODEL_FAST,
+            "claude-opus-4-5": "claude-opus-5-5"}
 BATCH_DISCOUNT = 0.5
 
 
@@ -53,11 +63,14 @@ def _db():
 
 def settings() -> dict:
     d = {"ai_enabled": False, "monthly_budget_usd": 25.0,
-         "model_by_task": {"themes": "claude-sonnet-4-5", "summary": DEFAULT_MODEL,
+         "model_by_task": {"themes": MODEL_DEEP, "summary": DEFAULT_MODEL,
                            "polish": DEFAULT_MODEL, "ask": DEFAULT_MODEL}}
     if SETTINGS.exists():
         try:
-            d.update(json.loads(SETTINGS.read_text()))
+            saved = json.loads(SETTINGS.read_text())
+            tasks = {**d["model_by_task"], **saved.pop("model_by_task", {})}
+            d.update(saved)
+            d["model_by_task"] = {k: REPLACED.get(v, v) for k, v in tasks.items()}
         except Exception:
             pass
     return d
@@ -148,8 +161,14 @@ def call(task: str, system: str, user: str, *, fallback: str = "",
                                messages=[{"role": "user", "content": user}])
         tin, tout = m.usage.input_tokens, m.usage.output_tokens
         cost = price(model, tin, tout)
+        # Current models may put a thinking block first; only text blocks are the answer.
+        text = "".join(b.text for b in m.content if b.type == "text").strip()
+        if m.stop_reason == "refusal" or not text:
+            r = f"fallback:{m.stop_reason or 'empty'}"
+            _log(task, model, tin, tout, cost, False, 0, r, specialist, doctor)
+            return Result(fallback, r, cost, tin, tout)
         _log(task, model, tin, tout, cost, False, 1, "llm", specialist, doctor)
-        return Result(m.content[0].text.strip(), "llm", cost, tin, tout)
+        return Result(text, "llm", cost, tin, tout)
     except Exception as e:
         r = f"fallback:{type(e).__name__}"
         _log(task, model, 0, 0, 0.0, False, 0, r, specialist, doctor)

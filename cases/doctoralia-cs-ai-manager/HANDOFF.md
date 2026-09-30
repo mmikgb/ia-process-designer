@@ -119,7 +119,7 @@ manager report, `FINDINGS.md`, `BUILD.md` and the plan.
 | `bb4dde2` | Control screen, watchlist context (lead times, ceiling, day-14), filters persist across screens. **Bug fix:** cache also ignored code edits. XmR lower limit floored at 0 (pickup chart drew negative minutes) |
 | `f69e78e` | Doctor panel: why now, the copilot's draft (editable, copy) or call brief, facts, monthly bookings, last contacts, done/snooze |
 | `8f75ffe` | My team screen: work per book, pickup per specialist, conversion when fast, every count opens that list |
-| `9033673` | Pulse and Cost screens. **Bug fix:** model prices in `llm.py` (Sonnet 4.5 is $3/$15, Opus 4.5 $5/$25 per MTok, per the official pricing page; the file had $2/$10 and $4/$20). Estimate moved from $1.754 to $1.88 |
+| `9033673` | Pulse and Cost screens. Price fix in `llm.py`: Sonnet 4.5 $3/$15, Opus 4.5 $5/$25 per MTok (correct for those models, but Sonnet 4.5 is the model being retired; see §11 T0.3, which moves to `claude-sonnet-5-5` at $2/$10 and brings the estimate back to $1.754). Estimate moved from $1.754 to $1.88 at the time |
 | `a50c9d5` | Live-demo hardening: KPI labels quote `RULES` instead of "30 min"/"under 6"; `bundle.py` writes straight into `web/` so `pnpm dev` hot-reloads after a rebuild |
 
 ### The web app, screen by screen
@@ -194,8 +194,8 @@ Vercel, real clipboard permissions in Safari, and anything with the AI switched 
    ~13 MB) so the web app runs without Python. They regenerate on every build.
 8. **v0 usage:** two generation rounds; the second cost $1.21 of a $5 monthly free credit.
    The v0 chat holds an early version; the repo is the source of truth.
-9. **Model IDs in `llm.py`** are Claude 4.5-generation models. Prices are now correct; whether
-   to move to current models is Miguel's call.
+9. ~~Model IDs in `llm.py` are Claude 4.5-generation models.~~ Moved to current models in
+   §11 T0.3.
 
 ---
 
@@ -272,3 +272,31 @@ first. Order to use: `pipeline.py` → `bundle.py` → `analysis.py`.
   `kbd`) will be written by hand on `@base-ui/react` in the phase that first uses them, matching
   the existing `base-nova` files in `components/ui/`. On a Mac with open network the CLI command
   in the spec works and can replace them.
+
+### T0.3 Models and prices
+
+- `src/llm.py` `PRICES`: added `claude-haiku-4-5-20251001` $1/$5, `claude-sonnet-5-5` $2/$10,
+  `claude-opus-5-5` $4/$20; kept the 4.5 rows for old ledger rows. New constants `MODEL_FAST`
+  (Haiku 4.5) and `MODEL_DEEP` (Sonnet 5.5); `DEFAULT_MODEL = MODEL_FAST`,
+  `model_by_task.themes = MODEL_DEEP`. `insight.cost_estimate()` now prices with these constants
+  instead of hard-coded 4.5 IDs, so the estimate follows the models actually used.
+- Prices and IDs checked against the Claude API reference bundled with Claude Code (models table
+  cached 2026-09-25). That table still lists `claude-sonnet-4-5` as active with no date; the spec
+  cites the deprecations page for "retirement not sooner than 2026-09-29". Either way the move
+  is right; the web deprecations page itself was not read from this container.
+- Found in the code, not in the spec:
+  - `save_settings()` writes the whole `model_by_task` into `out/settings.json`, so on any
+    machine where AI was once toggled in Streamlit the old models stayed pinned and a
+    default change would be silently ignored. `settings()` now merges per task and maps retired
+    IDs to their successors (`REPLACED`). Checked with a temp settings file holding the 4.5 IDs.
+  - `llm.call()` read `m.content[0].text`. On current models the first block can be a thinking
+    block, so every real call would have fallen back. It now joins the text blocks, and a
+    refusal or empty answer returns the fallback with its reason (and still logs the cost).
+  - `draft.polish()` calls Anthropic directly, outside `llm.py`, and nothing calls it. Pointed
+    at `MODEL_FAST` with the same text-block fix; removing it or routing it through `llm.call`
+    is left for Phase 4 (the web writer replaces it).
+- Cost screen: reads `cost.prices` and `cost.estimate` from the bundle; after a rebuild the
+  one-off enrichment estimate is **$1.754** (themes $0.252 + summaries $1.502), down from $1.88.
+  `BUILD.md` updated. The README "$0.10 per specialist" line is T4.8's.
+- Check: `python3 -c "import sys; sys.path.insert(0,'src'); import llm; print(llm.PRICES)"` prints
+  the six rows.

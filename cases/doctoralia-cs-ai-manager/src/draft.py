@@ -281,9 +281,10 @@ def polish(draft: str, facts: dict) -> tuple[str, str]:
         return draft, "deterministic"
     try:
         import anthropic
+        from llm import MODEL_FAST
         c = anthropic.Anthropic(api_key=key)
         m = c.messages.create(
-            model="claude-haiku-4-5", max_tokens=400,
+            model=MODEL_FAST, max_tokens=400,
             system=("Eres un especialista de Customer Success de Doctoralia México escribiendo "
                     "por WhatsApp a un doctor. Reescribe el mensaje para que suene natural y "
                     "cercano, de usted, máximo 60 palabras. REGLAS: no inventes ningún dato ni "
@@ -291,7 +292,9 @@ def polish(draft: str, facts: dict) -> tuple[str, str]:
                     "Devuelve solo el mensaje."),
             messages=[{"role": "user", "content": draft}],
         )
-        out = m.content[0].text.strip()
+        out = "".join(b.text for b in m.content if b.type == "text").strip()
+        if not out:
+            return draft, "deterministic (llm returned no text)"
         if set(NUM.findall(out)) - set(NUM.findall(draft)):
             return draft, "deterministic (llm added a number that was not in the facts)"
         return out, "llm-polished"

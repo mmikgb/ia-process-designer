@@ -138,10 +138,10 @@ def cost_estimate(all_notes: pd.DataFrame, tagged: pd.DataFrame, doc_count: int)
     def toks(df):
         return int(df.note.str.len().sum() / CHARS_PER_TOKEN)
     t_all, t_un = toks(uniq_all), toks(uniq_un)
-    themes_cost = llm.estimate("claude-sonnet-4-5", t_all + 600 * (len(uniq_all) // BATCH + 1),
+    themes_cost = llm.estimate(llm.MODEL_DEEP, t_all + 600 * (len(uniq_all) // BATCH + 1),
                                1500 * (len(uniq_all) // BATCH + 1), batch=True)
     sum_in = int(doc_count * 127)
-    sum_cost = llm.estimate("claude-haiku-4-5", sum_in, doc_count * 90, batch=True)
+    sum_cost = llm.estimate(llm.MODEL_FAST, sum_in, doc_count * 90, batch=True)
     return {
         "unique_notes_all": int(len(uniq_all)), "unique_notes_untagged": int(len(uniq_un)),
         "tokens_all": t_all, "tokens_untagged": t_un,
