@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 
 import notes as N
+from i18n import L, pct
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data" / "dataset.xlsx"
@@ -165,7 +166,9 @@ def doctor_features(t) -> pd.DataFrame:
     for c in ["complaints", "open_items", "unanswered_outbound", "ignored_streak"]:
         d[c] = pd.to_numeric(d[c], errors="coerce").fillna(0).astype(int)
 
-    d["risk_score"], d["risk_reasons"] = zip(*d.apply(risk, axis=1))
+    d["risk_score"], d["risk_reasons_i18n"] = zip(*d.apply(risk, axis=1))
+    # English, joined, for Streamlit and report.py; the web reads risk_reasons_i18n.
+    d["risk_reasons"] = d.risk_reasons_i18n.map(lambda rs: " · ".join(x["text"]["en"] for x in rs))
     return d
 
 
@@ -271,48 +274,73 @@ LIFT = {
 BASELINE_CHURN = 0.066
 
 
-def risk(r) -> tuple[float, str]:
+def _churn(key: str) -> str:
+    """A signal's churn rate as quoted in a reason, read from LIFT, never typed by hand."""
+    return pct(LIFT[key][1])
+
+
+def risk(r) -> tuple[float, list[dict]]:
     """Additive, inspectable, capped at 1.0. No model — every point traces to one
     rule, and every rule earns its weight from the LIFT table above. A specialist
-    who disagrees with a ranking can be shown the line and the number behind it."""
+    who disagrees with a ranking can be shown the line and the number behind it.
+
+    Returns (score, reasons); each reason is {"key", "text": L(en, es)}."""
     pts, why = 0.0, []
 
-    def add(w, msg):
+    def add(w, key, en, es):
         nonlocal pts
         pts += w
-        why.append(msg)
+        why.append({"key": key, "text": L(en, es)})
 
     # What the doctor said, as their own specialist wrote it down. Strongest signal
     # in the file by a factor of two, and it lived in free text nobody queried.
     if r.sig_churn_threat:
-        add(0.50, "said they would cancel or are comparing platforms (36% of these churn)")
+        c = _churn("churn_threat")
+        add(0.50, "churn_threat",
+            f"said they would cancel or are comparing platforms ({c} of these churn)",
+            f"dijo que cancelaría o está comparando plataformas ({c} de estos se van)")
     elif r.sig_discouraged:
-        add(0.25, "noted as discouraged with results (15% churn)")
+        c = _churn("discouraged")
+        add(0.25, "discouraged", f"noted as discouraged with results ({c} churn)",
+            f"anotado como desanimado con los resultados ({c} se van)")
 
     if r.complaints >= 1:
-        add(0.12, f"{int(r.complaints)} complaint(s) logged about patient volume or no-shows")
+        n = int(r.complaints)
+        add(0.12, "complaint", f"{n} complaint(s) logged about patient volume or no-shows",
+            f"{n} queja(s) registrada(s) por volumen de pacientes o ausentismo")
 
     # How they start predicts how they end.
     if r.onboarding_grade == "D":
-        add(0.30, "closed onboarding at grade D (17% churn)")
+        c = _churn("grade_D")
+        add(0.30, "grade_d", f"closed onboarding at grade D ({c} churn)",
+            f"cerró el onboarding en grado D ({c} se van)")
     elif r.onboarding_grade == "C":
-        add(0.10, "closed onboarding at grade C")
+        add(0.10, "grade_c", "closed onboarding at grade C", "cerró el onboarding en grado C")
 
     # The activation step that matters.
     if not r.calendar_enabled:
-        add(0.18, "online calendar never turned on (11% churn)")
+        c = _churn("calendar_off")
+        add(0.18, "calendar_off", f"online calendar never turned on ({c} churn)",
+            f"nunca activó la agenda en línea ({c} se van)")
     elif r.calendar_hollow:
-        add(0.08, f"calendar on but only {int(r.weekly_slots_published)} slots published")
+        n = int(r.weekly_slots_published)
+        add(0.08, "calendar_hollow", f"calendar on but only {n} slots published",
+            f"agenda encendida pero solo {n} {'horario publicado' if n == 1 else 'horarios publicados'}")
 
     # Against their own peers, not against the platform average.
     if r.bottom_quartile and pd.notna(r.median_specialty_city):
-        add(0.20, f"bottom quartile for {r.specialty} in {r.city} "
-                  f"({r.bookings_avg:.0f}/mo vs {r.median_specialty_city:.0f} median)")
+        avg, peer = f"{r.bookings_avg:.0f}", f"{r.median_specialty_city:.0f}"
+        add(0.20, "bottom_quartile",
+            f"bottom quartile for {r.specialty} in {r.city} ({avg}/mo vs {peer} median)",
+            f"cuartil inferior de {str(r.specialty).lower()} en {r.city} "
+            f"({avg}/mes vs mediana {peer})")
 
     if r.ignored_streak >= 3:
-        add(0.05, f"ignored the last {int(r.ignored_streak)} campaigns in a row")
+        n = int(r.ignored_streak)
+        add(0.05, "ignored_streak", f"ignored the last {n} campaigns in a row",
+            f"ignoró las últimas {n} campañas seguidas")
 
-    return round(min(pts, 1.0), 2), " · ".join(why)
+    return round(min(pts, 1.0), 2), why
 
 
 def escalation_features(t) -> pd.DataFrame:
