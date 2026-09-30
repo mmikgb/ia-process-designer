@@ -140,7 +140,9 @@ function StatusRow({ compact }: { compact: boolean }) {
   const on = !!ai?.enabled
   const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
+  useEffect(() => {
+    setMounted(true)
+  }, [])
   const dark = mounted && resolvedTheme === "dark"
   return (
     <div className={cn("flex flex-col gap-2 px-1", compact && "items-center lg:items-stretch")}>

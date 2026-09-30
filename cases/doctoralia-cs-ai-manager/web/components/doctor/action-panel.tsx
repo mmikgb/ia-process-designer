@@ -30,7 +30,9 @@ export function ActionPanel({
     setText(original)
     setCopied(false)
   }, [doc.doctor_id, original])
-  useEffect(() => onEdited?.(!!original && text !== original), [text, original, onEdited])
+  useEffect(() => {
+    onEdited?.(!!original && text !== original)
+  }, [text, original, onEdited])
 
   const copy = async () => {
     try {

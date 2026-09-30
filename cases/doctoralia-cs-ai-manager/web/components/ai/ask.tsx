@@ -70,7 +70,11 @@ function Drawer() {
     window.addEventListener(ASK_EVENT, onAsk)
     return () => window.removeEventListener(ASK_EVENT, onAsk)
   }, [])
-  useEffect(() => end.current?.scrollIntoView({ block: "end" }), [turns])
+  // braces: an effect must return nothing (scrollIntoView returns a Promise in recent Chrome,
+  // which React would later call as a cleanup: "i is not a function")
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "end" })
+  }, [turns])
   useEffect(() => () => ctrl.current?.abort(), [])
 
   const patch = (fn: (a: Turn) => Turn) => setTurns((ts) => [...ts.slice(0, -1), fn(ts[ts.length - 1])])
