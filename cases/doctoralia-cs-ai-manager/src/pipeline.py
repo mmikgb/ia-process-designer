@@ -166,6 +166,8 @@ def doctor_features(t) -> pd.DataFrame:
     tagged = N.tag_interactions(inter)
     sig = N.doctor_signals(tagged, extract)
     d = d.merge(sig, left_on="doctor_id", right_index=True, how="left")
+    # The follow-ups they scheduled in their latest note ("Lo agendé para revisión en N días").
+    d = d.merge(N.followups(inter), left_on="doctor_id", right_index=True, how="left")
     for c in ["sig_churn_threat", "sig_discouraged", "sig_gatekeeper", "sig_whatsapp_only",
               "sig_onboarding_no_show", "sig_hollow_calendar", "sig_multi_site",
               "sig_billing_issue", "commitment_open"]:

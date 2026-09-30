@@ -329,3 +329,19 @@ first. Order to use: `pipeline.py` → `bundle.py` → `analysis.py`.
     doctor that can be a complaint note of the same priority rather than the "desanimado" note.
     Left as is.
 - `tests/test_draft.py`: 12 tests, including every check the spec lists.
+
+### T1.4 Follow-ups from the specialists' own notes
+
+- `notes.followup()` / `notes.followups()`: the four patterns in the spec, applied to the
+  latest interaction per doctor only. When one note schedules two ("Reintentar la próxima
+  semana. Seguimiento el viernes."), the earlier date wins. "Seguimiento el lunes" written on a
+  Monday → the following Monday.
+- New columns on the doctor table: `followup_due_at`, `followup_kind`, `followup_note`,
+  `followup_set_at`, `followup_set_by`. They are merged in `pipeline.doctor_features()`, not in
+  `doctor_signals()`, because `doctor_signals()` only has rows for doctors with a tagged note.
+- `python3 src/notes.py` at 2026-09-25, active doctors: **1,498** with a follow-up; overdue by
+  1–14 days **463**; due today 37; due within 5 days 121; due later 33; stale (>14 days
+  overdue) **844**. By kind: review 632, weekday 618, retry 142, reschedule 106. 3,187 notes
+  mention scheduling but match no rule. Almost all are the bare "Reagendar." after an
+  onboarding no-show, which carries no date.
+- `tests/test_notes.py`: 14 tests.

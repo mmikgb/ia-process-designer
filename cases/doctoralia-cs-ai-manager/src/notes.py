@@ -95,6 +95,58 @@ UPSELL_LABELS = {
 }
 
 
+# --- follow-ups the specialists scheduled in their own notes -----------------
+# ("Lo agendé para revisión en 4 días", "Seguimiento el jueves"). Only the latest
+# interaction per doctor counts: a newer contact supersedes an older promise.
+WEEKDAYS = {"lunes": 0, "martes": 1, "miercoles": 2, "miércoles": 2, "jueves": 3, "viernes": 4}
+FOLLOWUP_RULES: list[tuple[str, str]] = [
+    ("review",     r"revisi[oó]n en (\d+) d[ií]as"),              # note date + N days
+    ("reschedule", r"reagendar en (\d+) d[ií]as"),                # note date + N days
+    ("retry",      r"reintentar la pr[oó]xima semana"),            # note date + 7 days
+    ("weekday",    r"seguimiento el (lunes|martes|mi[eé]rcoles|jueves|viernes)"),  # next such day
+]
+FOLLOWUP_COMPILED = [(k, re.compile(r, re.I)) for k, r in FOLLOWUP_RULES]
+
+
+def followup(note, at) -> tuple[pd.Timestamp, str] | None:
+    """(due date, kind) for the follow-up a note schedules, or None. When a note
+    schedules two (\"Reintentar la próxima semana. Seguimiento el viernes.\"), the
+    earlier date wins: that is the first moment the doctor is owed a contact."""
+    if not isinstance(note, str) or pd.isna(at):
+        return None
+    day = pd.Timestamp(at).normalize()
+    found = []
+    for kind, rx in FOLLOWUP_COMPILED:
+        m = rx.search(note)
+        if not m:
+            continue
+        if kind in ("review", "reschedule"):
+            due = day + pd.Timedelta(days=int(m.group(1)))
+        elif kind == "retry":
+            due = day + pd.Timedelta(days=7)
+        else:
+            wd = WEEKDAYS[m.group(1).lower()]
+            ahead = (wd - day.weekday()) % 7 or 7     # strictly after the note date
+            due = day + pd.Timedelta(days=ahead)
+        found.append((due, kind))
+    return min(found) if found else None
+
+
+def followups(inter: pd.DataFrame) -> pd.DataFrame:
+    """One row per doctor whose latest interaction schedules a follow-up."""
+    last = (inter.sort_values(["doctor_id", "occurred_at", "interaction_id"])
+            .groupby("doctor_id").tail(1))
+    rows = []
+    for r in last.itertuples():
+        f = followup(r.note, r.occurred_at)
+        if f:
+            rows.append((r.doctor_id, f[0], f[1], r.note, pd.Timestamp(r.occurred_at).normalize(),
+                         r.specialist_id))
+    return pd.DataFrame(rows, columns=["doctor_id", "followup_due_at", "followup_kind",
+                                       "followup_note", "followup_set_at", "followup_set_by"]
+                        ).set_index("doctor_id")
+
+
 def doctor_signals(tagged: pd.DataFrame, asof: pd.Timestamp) -> pd.DataFrame:
     """Collapse the long table to one row per doctor."""
     t = tagged[tagged.tag != "untagged"].copy()
@@ -162,6 +214,23 @@ if __name__ == "__main__":
     d = doctor_signals(tg, pd.Timestamp(PR["extract_date"]))
     print(f"\ndoctors with at least one signal: {len(d)}")
     print("\ntop_signal distribution:"); print(d.top_signal.value_counts().to_string())
+    fu = followups(t["interactions"])
+    doc = t["doctors"].set_index("doctor_id")
+    fu = fu[fu.index.map(doc.status) == "active"]
+    asof = pd.Timestamp(PR["extract_date"])
+    stale = PR.get("followup_stale_days", 14)
+    late = (asof - fu.followup_due_at).dt.days
+    print(f"\nfollow-ups in the latest note, active doctors: {len(fu)}")
+    print(f"  overdue by 1-{stale} days: {int(late.between(1, stale).sum())}")
+    print(f"  due today:                {int((late == 0).sum())}")
+    print(f"  due within 5 days:        {int(late.between(-5, -1).sum())}")
+    print(f"  due later:                {int((late < -5).sum())}")
+    print(f"  stale (overdue >{stale} days): {int((late > stale).sum())}")
+    print("  by kind:", fu.followup_kind.value_counts().to_dict())
+    loose = t["interactions"].note.str.contains(r"reagend|seguimiento|reintent", case=False, na=False)
+    parsed = t["interactions"].note.map(lambda n: followup(n, asof) is not None)
+    print(f"  notes that mention scheduling but match no rule: {int((loose & ~parsed).sum())}"
+          " (e.g. a bare \"Reagendar.\" after an onboarding no-show)")
     if untagged:
         print("\nsample untagged notes:")
         print(tg[tg.tag == "untagged"].note.dropna().drop_duplicates().head(10).to_string())
