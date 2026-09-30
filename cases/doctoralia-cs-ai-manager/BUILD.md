@@ -13,6 +13,24 @@ python3 src/bundle.py          # build the contract — ~12s
 streamlit run src/app.py       # the app
 ```
 
+### The web dashboard (`web/`)
+
+Next.js + shadcn/ui + Recharts, first drafted in v0 with the Doctoralia palette.
+It reads `out/overview.json`, which every `bundle.py` run writes; `pnpm dev` and
+`pnpm build` copy it into `web/data/` first. The browser only picks which
+precomputed block to show and filters rows — every number is computed in Python.
+
+```bash
+python3 src/bundle.py          # also writes out/overview.json
+cd web && pnpm install && pnpm dev    # http://localhost:3000
+```
+
+Controls: view as Manager / Specialist, portfolio (whole book, team, specialist),
+compare last 30 / 60 / 90 days, watchlist tier, signal, sort by lead time or risk,
+Done / Snooze 7d (kept in this browser), and the attention rows open the matching
+doctors. Thresholds are deliberately not a control: they live in `pipeline.py`
+so every screen shows the same number.
+
 No API key needed. Everything works with AI off; that is the default.
 
 ## The modules

@@ -1,0 +1,96 @@
+"use client"
+
+import { ArrowDown, ArrowUp } from "lucide-react"
+import { Line, LineChart, ResponsiveContainer } from "recharts"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { cn } from "@/lib/utils"
+import { formatDeltaPct, isGoodDelta, pyFormat } from "@/lib/format"
+import type { KpiItem } from "@/lib/types"
+
+export function KpiGrid({ kpis }: { kpis: KpiItem[] }) {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {kpis.map((kpi) => (
+        <KpiCard key={kpi.key} kpi={kpi} />
+      ))}
+    </div>
+  )
+}
+
+function KpiCard({ kpi }: { kpi: KpiItem }) {
+  const hasDelta = kpi.delta_pct !== null
+  const isIncrease = hasDelta && kpi.delta_pct! > 0
+  const good = hasDelta && isGoodDelta(kpi.delta_pct!, kpi.good)
+  const hasSpark = kpi.spark.length > 1
+
+  return (
+    <Card className="rounded-xl border-border">
+      <CardHeader className="gap-1 pb-0">
+        <span className="text-xs font-medium text-muted-foreground">{kpi.label}</span>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2 pt-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-mono text-3xl font-semibold tabular-nums text-foreground">
+            {pyFormat(kpi.value, kpi.fmt)}
+          </span>
+          {hasDelta && (
+            <Badge
+              variant="secondary"
+              className={cn(
+                "gap-0.5 bg-transparent",
+                good ? "text-success" : "text-destructive"
+              )}
+            >
+              {isIncrease ? (
+                <ArrowUp data-icon="inline-start" className="size-3" />
+              ) : (
+                <ArrowDown data-icon="inline-start" className="size-3" />
+              )}
+              {formatDeltaPct(kpi.delta_pct!)}
+            </Badge>
+          )}
+        </div>
+
+        {hasSpark && (
+          // Neutral line: the direction is shown, the judgement is only in the end dot,
+          // which follows the same good/bad rule as the delta badge.
+          <div className="h-10 w-full" aria-hidden>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={kpi.spark.map((v, i) => ({ i, v }))} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+                <Line
+                  type="monotone"
+                  dataKey="v"
+                  stroke="var(--color-muted-foreground)"
+                  strokeWidth={1.5}
+                  isAnimationActive={false}
+                  dot={(p: { cx?: number; cy?: number; index?: number }) =>
+                    p.index === kpi.spark.length - 1 && p.cx != null && p.cy != null ? (
+                      <circle
+                        key="last"
+                        cx={p.cx}
+                        cy={p.cy}
+                        r={3}
+                        fill={
+                          !hasDelta
+                            ? "var(--color-muted-foreground)"
+                            : good
+                              ? "var(--color-success)"
+                              : "var(--color-destructive)"
+                        }
+                      />
+                    ) : (
+                      <g key={`d${p.index}`} />
+                    )
+                  }
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        <p className="text-xs text-muted-foreground text-pretty">{kpi.note}</p>
+      </CardContent>
+    </Card>
+  )
+}
