@@ -1,9 +1,4 @@
 # --- CONFIDENCIAL: el dataset de Doctoralia nunca se sube ---
-# El business case dice: "Do not share it, store it outside your own device,
-# or reuse it elsewhere." Se queda solo en tu Mac.
-**/data/*.xlsx
-**/data/*.csv
-*.xlsx
 
 # Secretos
 .env
