@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { ASK_EVENT, SidebarContent } from "@/components/shell/sidebar"
 import { WhoDialog } from "@/components/shell/who-dialog"
 import { CommandPalette } from "@/components/shell/command-palette"
+import { DoctorSheetHost } from "@/components/shell/doctor-sheet-host"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { useT } from "@/lib/i18n"
@@ -27,6 +28,7 @@ export function AppShell({ data, children }: { data: ShellData; children: React.
           </div>
           <WhoDialog />
           <CommandPalette />
+          <DoctorSheetHost />
           <ShellEvents />
           <Toaster position="bottom-right" />
         </TooltipProvider>

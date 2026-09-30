@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { DoctorPanel } from "@/components/doctor/doctor-panel"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { doctorHref } from "@/components/shell/doctor-sheet-host"
 import { AttentionList } from "@/components/overview/attention-list"
 import { FilterBar } from "@/components/overview/filter-bar"
 import { HeroCard } from "@/components/overview/hero-card"
@@ -13,13 +14,12 @@ import { Worklist } from "@/components/overview/worklist"
 import {
   defaultFilters,
   loadFilters,
-  loadHandled,
   saveFilters,
-  saveHandled,
   scopeLabel,
   type Filters,
   type Handled,
 } from "@/lib/controls"
+import { useHandled } from "@/lib/handled"
 import { useIdentity } from "@/lib/identity"
 import type { OverviewData } from "@/lib/types"
 
@@ -36,12 +36,14 @@ export function Dashboard({ data }: { data: OverviewData }) {
     () => ({ ...stored, scope: data.scopes[book] ? book : "all", role: who?.kind === "specialist" ? "specialist" : "manager" }),
     [stored, book, who, data.scopes],
   )
-  const [handled, setHandled] = useState<Record<string, Handled>>({})
+  const [handled, setHandledOne] = useHandled()
+  const router = useRouter()
+  const path = usePathname()
+  const params = useSearchParams()
   // Fixed per page load so a snooze does not expire mid-render.
   const [now] = useState(() => new Date())
 
   useEffect(() => {
-    setHandled(loadHandled())
     const saved = loadFilters(data)
     if (saved) setFilters(saved)
   }, [data])
@@ -55,22 +57,8 @@ export function Dashboard({ data }: { data: OverviewData }) {
     })
   }, [setScope])
 
-  const onHandle = useCallback((id: string, h: Handled | null) => {
-    setHandled((prev) => {
-      const next = { ...prev }
-      if (h) next[id] = h
-      else delete next[id]
-      saveHandled(next)
-      return next
-    })
-  }, [])
+  const onHandle = useCallback((id: string, h: Handled | null) => setHandledOne(id, h), [setHandledOne])
 
-  const [openDoc, setOpenDoc] = useState<{ id: string; owner: string } | null>(null)
-  const closeDoc = useCallback(() => setOpenDoc(null), [])
-  const ownerName = useCallback(
-    (id: string) => data.specialists.find((s) => s.id === id)?.name ?? id,
-    [data.specialists],
-  )
 
   const scope = data.scopes[filters.scope] ?? data.scopes.all
   const kpi = scope.periods[filters.period] ?? scope.periods[String(data.kpi.window_days)]
@@ -111,16 +99,8 @@ export function Dashboard({ data }: { data: OverviewData }) {
         onChange={onChange}
         handled={handled}
         onHandle={onHandle}
-        onOpenDoctor={(id, owner) => setOpenDoc({ id, owner })}
+        onOpenDoctor={(id) => router.push(doctorHref(path, params, id), { scroll: false })}
         now={now}
-      />
-
-      <DoctorPanel
-        target={openDoc}
-        ownerName={ownerName}
-        handled={openDoc ? handled[openDoc.id] : undefined}
-        onHandle={(h) => openDoc && onHandle(openDoc.id, h)}
-        onClose={closeDoc}
       />
 
       <WatchlistContext predict={data.predict} />

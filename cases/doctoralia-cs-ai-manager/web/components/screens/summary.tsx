@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { Page } from "@/components/shell/page"
 import { Dashboard } from "@/components/overview/dashboard"
 import { useT } from "@/lib/i18n"
@@ -24,7 +25,9 @@ export function SummaryScreen({ data }: { data: OverviewData }) {
       title={t("nav.summary")}
       subtitle={t("summary.subtitle", { scope: label, n: num(book.active), risk: num(book.atRisk), days: 30 })}
     >
-      <Dashboard data={data} />
+      <Suspense fallback={null}>
+        <Dashboard data={data} />
+      </Suspense>
     </Page>
   )
 }
