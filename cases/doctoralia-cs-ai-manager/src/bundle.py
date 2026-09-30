@@ -26,6 +26,10 @@ import draft as D
 OUT = ROOT / "out"
 CACHE = OUT / "bundles"
 SCHEMA_VERSION = "1.2"
+# The shape of the web view (overview.json, queue/, doctors/, search.json). Bump it whenever
+# the web app starts to need a field; web/scripts/sync-data.mjs refuses to copy an out/ with
+# a lower number over the committed data (a stale out/ used to break /costo silently).
+WEB_SCHEMA = 2
 
 REQUIRED = {
     "doctors": ["doctor_id", "signup_date", "status", "owner_specialist_id",
@@ -203,6 +207,7 @@ def web_view(b: dict, top: int = 12) -> dict:
     return {
         "meta": {**{k: b["meta"][k] for k in
                     ["built_at", "source_file", "source_sha256_16", "extract_date"]},
+                 "web_schema": WEB_SCHEMA,
                  "asof": P.RULES["extract_date"],
                  "queue_capacity": P.RULES["daily_capacity"],
                  "followup_quota": P.RULES["daily_followup_quota"],

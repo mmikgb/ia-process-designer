@@ -2,17 +2,40 @@
 // one doctor-dossier file and one day-plan file per specialist, and the search
 // index. Python computes every number, every draft and every queue order; this
 // app only displays them.
-import { copyFileSync, cpSync, existsSync, mkdirSync, rmSync } from "node:fs"
+//
+// An out/ from an older bundle.py (a lower meta.web_schema than the committed
+// data/overview.json) is not copied: it would replace the branch's data with a
+// shape the screens no longer read. Rebuild it instead (the message says how).
+import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs"
 
 const out = new URL("../../out/", import.meta.url)
 const overview = new URL("overview.json", out)
+const committed = new URL("../data/overview.json", import.meta.url)
 
-if (existsSync(overview)) {
-  copyFileSync(overview, new URL("../data/overview.json", import.meta.url))
-  console.log("data: synced out/overview.json")
-} else {
-  console.log("data: out/overview.json not found, using the committed data/overview.json (run python3 src/bundle.py to refresh)")
+const schema = (file) => {
+  try {
+    return JSON.parse(readFileSync(file, "utf8")).meta?.web_schema ?? 0
+  } catch {
+    return 0
+  }
 }
+
+if (!existsSync(overview)) {
+  console.log("data: out/overview.json not found, using the committed data (run python3 src/bundle.py to refresh)")
+  process.exit(0)
+}
+const have = schema(overview)
+const need = existsSync(committed) ? schema(committed) : 0
+if (have < need) {
+  console.warn(
+    `data: out/ is from an older bundle.py (web_schema ${have} < ${need}); keeping the committed data.\n` +
+      "      Refresh it with: python3 src/pipeline.py && python3 src/bundle.py",
+  )
+  process.exit(0)
+}
+
+copyFileSync(overview, committed)
+console.log("data: synced out/overview.json")
 
 for (const dir of ["doctors", "queue"]) {
   const from = new URL(`${dir}/`, out)

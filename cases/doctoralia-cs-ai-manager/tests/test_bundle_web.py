@@ -90,3 +90,15 @@ def test_llm_budget_includes_the_web_ledger(tmp_path, monkeypatch):
     s = llm.summary(30)
     assert s["calls"] == 1 and abs(s["spend"] - 0.0022) < 1e-4
     assert s["by_task"][0]["task"] == "web:message"
+
+
+def test_overview_carries_the_web_schema():
+    """web/scripts/sync-data.mjs compares this number to refuse a stale out/."""
+    import bundle
+    p = OUT / "overview.json"
+    if not p.exists():
+        pytest.skip("run python3 src/bundle.py first")
+    meta = json.loads(p.read_text())["meta"]
+    assert meta["web_schema"] == bundle.WEB_SCHEMA
+    committed = Path(__file__).resolve().parent.parent / "web" / "data" / "overview.json"
+    assert json.loads(committed.read_text())["meta"]["web_schema"] <= bundle.WEB_SCHEMA
