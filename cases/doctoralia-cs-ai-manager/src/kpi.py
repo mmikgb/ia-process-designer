@@ -20,9 +20,9 @@ def _kpi(key, label, value, prev, fmt="{:.0f}", good="up", spark=None, note=""):
             "fmt": fmt, "good": good, "spark": spark or [], "note": note}
 
 
-def build(t, doc, esc, ser, asof: pd.Timestamp) -> dict:
-    cur_a, cur_b = asof - pd.Timedelta(days=WINDOW), asof
-    pre_a, pre_b = asof - pd.Timedelta(days=2 * WINDOW), cur_a
+def build(t, doc, esc, ser, asof: pd.Timestamp, window: int = WINDOW) -> dict:
+    cur_a, cur_b = asof - pd.Timedelta(days=window), asof
+    pre_a, pre_b = asof - pd.Timedelta(days=2 * window), cur_a
     active = doc[doc.status == "active"]
 
     # ---- hero: one number for the portfolio, defined so it can be explained
@@ -55,7 +55,7 @@ def build(t, doc, esc, ser, asof: pd.Timestamp) -> dict:
         _kpi("sla", f"Escalations answered in 30 min",
              e_cur.within_target.mean() if len(e_cur) else None,
              e_pre.within_target.mean() if len(e_pre) else None,
-             "{:.0%}", "up", sp_sla, note=f"{len(e_cur)} escalations in the last {WINDOW} days"),
+             "{:.0%}", "up", sp_sla, note=f"{len(e_cur)} escalations in the last {window} days"),
         _kpi("conversion", "Escalation conversion",
              e_cur.converted.mean() if len(e_cur) else None,
              e_pre.converted.mean() if len(e_pre) else None,
@@ -104,7 +104,7 @@ def build(t, doc, esc, ser, asof: pd.Timestamp) -> dict:
         s["share"] = round(s["n"] / tot, 4)
 
     return {
-        "asof": str(asof.date()), "window_days": WINDOW,
+        "asof": str(asof.date()), "window_days": window,
         "health_score": round(health, 1),
         "health_note": ("100 minus the mean risk score across active doctors. Every point traces "
                         "to a rule in pipeline.py, so this number can be taken apart."),
@@ -113,3 +113,52 @@ def build(t, doc, esc, ser, asof: pd.Timestamp) -> dict:
                    "specialists": int((pd.DataFrame(t["specialists"]).role == "Farming Specialist").sum()),
                    "doctors": int(len(doc))},
     }
+
+
+# ---- scoped views: the same KPIs for a team or one specialist's portfolio ----
+
+PERIODS = [30, 60, 90]
+BY_DOCTOR = ["doctors", "onboardings", "escalations", "interactions",
+             "campaign_enrollments", "bookings_monthly"]
+
+
+def _slice(t: dict, ids: set) -> dict:
+    return {k: (v[v.doctor_id.isin(ids)] if k in BY_DOCTOR else v) for k, v in t.items()}
+
+
+def scopes(t, doc, esc, asof: pd.Timestamp) -> dict:
+    """KPIs for every portfolio a person can pick, at every period, computed here.
+
+    A scope is a set of doctors: the whole book, a farming team, or one
+    specialist's owned accounts. Onboardings and escalations follow the doctor,
+    not the person who handled them, so "my portfolio" means what happened to
+    my doctors. Churn and lift in the attention list stay portfolio-wide: a
+    signal's lift is a property of the signal, and a 400-doctor book is too
+    small to re-measure it.
+    """
+    import series  # local: series imports pipeline, which imports this module's callers
+    sp = t["specialists"].merge(t["teams"], on="team_id")
+    farm = sp[sp.role == "Farming Specialist"]
+    groups = {"all": (set(doc.doctor_id), len(farm))}
+    for team, g in farm.groupby("team_name"):
+        groups[f"team:{team}"] = (set(doc[doc.owner_specialist_id.isin(g.specialist_id)].doctor_id), len(g))
+    for sid in farm.specialist_id:
+        groups[sid] = (set(doc[doc.owner_specialist_id == sid].doctor_id), 1)
+
+    base = build(t, doc, esc, series.build(t), asof)
+    lift = {a["key"]: (a["churn"], a["lift"]) for a in base["attention"]}
+
+    out = {}
+    for key, (ids, n_sp) in groups.items():
+        ts, d, e = _slice(t, ids), doc[doc.doctor_id.isin(ids)], esc[esc.doctor_id.isin(ids)]
+        ser = series.build(ts)
+        per = {}
+        for w in PERIODS:
+            k = build(ts, d, e, ser, asof, window=w)
+            for a in k["attention"]:
+                a["churn"], a["lift"] = lift.get(a["key"], (a["churn"], a["lift"]))
+            k["attention"].sort(key=lambda x: -x["lift"])
+            k["totals"]["specialists"] = n_sp
+            per[str(w)] = k
+        out[key] = {"periods": per, "weekly_onboardings": ser["weekly"]["onboardings"]}
+    return out

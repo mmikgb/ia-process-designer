@@ -24,7 +24,7 @@ import series, spc, forecast, insight, llm, kpi
 
 OUT = ROOT / "out"
 CACHE = OUT / "bundles"
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 
 REQUIRED = {
     "doctors": ["doctor_id", "signup_date", "status", "owner_specialist_id",
@@ -109,7 +109,10 @@ def build(xlsx: Path | None = None, use_llm: bool = True, cache: bool = True) ->
 
     h = file_hash(xlsx)
     CACHE.mkdir(parents=True, exist_ok=True)
-    cached = CACHE / f"{h}.json"
+    # The key covers the rules and the schema too: editing a threshold in
+    # pipeline.py must rebuild, not hand back the bundle from before the edit.
+    rules_h = hashlib.sha256(json.dumps(P.RULES, sort_keys=True).encode()).hexdigest()[:8]
+    cached = CACHE / f"{h}-{rules_h}-v{SCHEMA_VERSION}.json"
     if cache and cached.exists():
         b = json.loads(cached.read_text())
         b["meta"]["from_cache"] = True
@@ -148,6 +151,7 @@ def build(xlsx: Path | None = None, use_llm: bool = True, cache: bool = True) ->
         "series": ser,
         "spc": spc.build(t, ser),
         "kpi": kpi.build(t, doc, esc, ser, asof),
+        "scopes": kpi.scopes(t, doc, esc, asof),
         "predict": forecast.build(t, doc, tagged, ser, asof),
         "insights": insight.build(t, doc, tagged, use_llm=use_llm),
         "llm": {"enabled": llm.enabled()[0], "reason": llm.enabled()[1],
@@ -164,31 +168,52 @@ def build(xlsx: Path | None = None, use_llm: bool = True, cache: bool = True) ->
 
 
 WATCH_FIELDS = ["doctor_id", "doctor_name", "specialty", "city", "owner_specialist_id",
-                "top_signal", "days_of_lead_left", "tier", "risk_score", "quote"]
+                "top_signal", "days_elapsed", "lead_median", "days_of_lead_left", "overdue",
+                "tier", "risk_score", "bookings_avg", "median_specialty_city", "signal_at", "quote"]
+WEB_RULES = ["calendar_healthy_slots", "escalation_pickup_target_min", "peer_low_percentile",
+             "stale_contact_days", "extract_date"]
 
 
 def web_view(b: dict, top: int = 12) -> dict:
-    """The slice of the bundle the Next.js overview reads. Kilobytes, not 23 MB."""
+    """The slice of the bundle the Next.js app reads. Hundreds of KB, not 23 MB.
+
+    Every number the controls can show is precomputed here: one KPI block per
+    scope (whole book, team, specialist) and period. The browser only picks a
+    block and filters the watchlist rows; it never computes a metric.
+    """
     wl = b["predict"]["watchlist"]
     tiers: dict[str, int] = {}
     for w in wl:
         tiers[w["tier"]] = tiers.get(w["tier"], 0) + 1
     act = sorted((w for w in wl if w["tier"] == "act_now"),
                  key=lambda w: (w["days_of_lead_left"], -w["risk_score"]))[:top]
+    keep = ["doctor_id", "doctor_name", "specialty", "city", "owner_specialist_id",
+            "top_signal", "days_of_lead_left", "tier", "risk_score", "quote"]
+    sp = {s["specialist_id"]: s for s in b["specialists"]}
+    teams = {t["team_id"]: t["team_name"] for t in b["teams"]}
+    people = [{"id": k, "name": v["specialist_name"], "team": teams.get(v["team_id"], "")}
+              for k, v in sp.items() if v.get("role") == "Farming Specialist"]
     return {
         "meta": {k: b["meta"][k] for k in
                  ["built_at", "source_file", "source_sha256_16", "extract_date"]},
+        "rules": {k: b["meta"]["rules"][k] for k in WEB_RULES},
+        # the whole book at the default period, kept for screens that do not filter
         "kpi": b["kpi"],
         "weekly_onboardings": b["series"]["weekly"]["onboardings"],
+        "periods": kpi.PERIODS,
+        "specialists": sorted(people, key=lambda p: p["id"]),
+        "teams": sorted({p["team"] for p in people}),
+        "scopes": b["scopes"],
         "watchlist": {"tiers": tiers,
-                      "act_now_top": [{k: w[k] for k in WATCH_FIELDS} for w in act]},
+                      "act_now_top": [{k: w[k] for k in keep} for w in act],
+                      "items": [{k: w[k] for k in WATCH_FIELDS} for w in wl]},
     }
 
 
 def write_web_view(b: dict) -> Path:
     OUT.mkdir(exist_ok=True)
     p = OUT / "overview.json"
-    p.write_text(json.dumps(web_view(b), ensure_ascii=False, indent=1))
+    p.write_text(json.dumps(web_view(b), ensure_ascii=False, separators=(",", ":")))
     return p
 
 
