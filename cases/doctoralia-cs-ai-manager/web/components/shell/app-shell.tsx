@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { toast } from "sonner"
 import { ASK_EVENT, SidebarContent } from "@/components/shell/sidebar"
 import { WhoDialog } from "@/components/shell/who-dialog"
+import { CommandPalette } from "@/components/shell/command-palette"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { useT } from "@/lib/i18n"
@@ -25,6 +26,7 @@ export function AppShell({ data, children }: { data: ShellData; children: React.
             <div className="flex min-w-0 flex-1 flex-col">{children}</div>
           </div>
           <WhoDialog />
+          <CommandPalette />
           <ShellEvents />
           <Toaster position="bottom-right" />
         </TooltipProvider>
