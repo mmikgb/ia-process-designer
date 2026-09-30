@@ -54,6 +54,7 @@ export const es = {
   "assistant.cta": "Preguntar",
   "assistant.soon": "El asistente llega en la fase 4. Mientras, usa la búsqueda (⌘K).",
   "ai.on": "IA activa · {models}",
+  "ai.on.mock": "IA de prueba · {models}",
   "ai.off.short": "IA apagada",
   "ai.off": "IA apagada: se muestra la versión automática",
   "lang.label": "Idioma",

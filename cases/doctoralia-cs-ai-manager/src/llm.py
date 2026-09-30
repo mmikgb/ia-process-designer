@@ -19,6 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "out"
 LEDGER = OUT / "llm_ledger.db"
+WEB_LEDGER = OUT / "llm_ledger_web.jsonl"     # written by web/lib/server/ledger.ts
 SETTINGS = OUT / "settings.json"
 
 # $ per million tokens. Source: platform.claude.com/docs/en/about-claude/pricing and
@@ -106,12 +107,29 @@ def set_api_key(k: str) -> str:
         return "session only (install `keyring` to persist)"
 
 
+def web_rows(days: int = 30) -> list[dict]:
+    """The web app's AI calls (one JSON line each). One budget covers both sides."""
+    if not WEB_LEDGER.exists():
+        return []
+    since = time.time() - days * 86400
+    out = []
+    for line in WEB_LEDGER.read_text(encoding="utf-8").splitlines():
+        try:
+            r = json.loads(line)
+            ts = time.mktime(time.strptime(r["ts"][:19], "%Y-%m-%dT%H:%M:%S")) - time.timezone
+        except (ValueError, KeyError):
+            continue
+        if ts > since:
+            out.append(r)
+    return out
+
+
 def month_spend() -> float:
     c = _db()
     since = time.time() - 30 * 86400
     v = c.execute("SELECT COALESCE(SUM(cost),0) FROM calls WHERE ts > ?", (since,)).fetchone()[0]
     c.close()
-    return float(v)
+    return float(v) + sum(float(r.get("cost") or 0) for r in web_rows(30))
 
 
 def enabled() -> tuple[bool, str]:
@@ -189,6 +207,16 @@ def summary(days: int = 30) -> dict:
                          (since,)).fetchall()
     c.close()
     s = settings()
+    web = web_rows(days)
+    web_spend = sum(float(r.get("cost") or 0) for r in web)
+    web_fb = sum(1 for r in web if str(r.get("source", "")).startswith("fallback"))
+    by_web: dict[tuple, list] = {}
+    for r in web:
+        by_web.setdefault((f"web:{r.get('task')}", r.get("model")), []).append(r)
+    rows = list(rows) + [(k[0], k[1], len(v), sum(x.get("tokens_in", 0) for x in v),
+                          sum(x.get("tokens_out", 0) for x in v), sum(x.get("cost", 0) for x in v),
+                          sum(1 for x in v if x.get("ok"))) for k, v in by_web.items()]
+    tot = ((tot[0] or 0) + len(web), (tot[1] or 0) + web_spend, (tot[2] or 0) + len(web) - web_fb)
     return {
         "days": days, "calls": tot[0] or 0, "spend": round(tot[1] or 0.0, 4),
         "fallbacks": (tot[0] or 0) - (tot[2] or 0),

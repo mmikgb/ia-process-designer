@@ -70,3 +70,23 @@ def test_read_work_log_applies_undo(tmp_path, monkeypatch):
     monkeypatch.setattr(state, "WORK_LOG", log)
     assert [e["id"] for e in state.read_work_log()] == ["w1", "w3"]
     assert [e["id"] for e in state.read_work_log("S01")] == ["w1"]
+
+
+def test_llm_budget_includes_the_web_ledger(tmp_path, monkeypatch):
+    import datetime as dt
+    import llm
+    monkeypatch.setattr(llm, "OUT", tmp_path)
+    monkeypatch.setattr(llm, "LEDGER", tmp_path / "llm_ledger.db")
+    monkeypatch.setattr(llm, "SETTINGS", tmp_path / "settings.json")
+    web = tmp_path / "llm_ledger_web.jsonl"
+    now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    web.write_text(json.dumps({"ts": now, "task": "message", "model": "claude-haiku-4-5-20251001",
+                               "tokens_in": 1200, "tokens_out": 200, "cost": 0.0022, "ok": True,
+                               "source": "llm"}) + "\n" +
+                   json.dumps({"ts": "2020-01-01T00:00:00.000Z", "task": "ask", "cost": 9.0,
+                               "source": "llm", "ok": True}) + "\n")
+    monkeypatch.setattr(llm, "WEB_LEDGER", web)
+    assert abs(llm.month_spend() - 0.0022) < 1e-9
+    s = llm.summary(30)
+    assert s["calls"] == 1 and abs(s["spend"] - 0.0022) < 1e-4
+    assert s["by_task"][0]["task"] == "web:message"

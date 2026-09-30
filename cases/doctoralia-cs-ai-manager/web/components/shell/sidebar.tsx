@@ -21,6 +21,7 @@ import { Kbd } from "@/components/ui/kbd"
 import { useT } from "@/lib/i18n"
 import { useIdentity, whoName } from "@/lib/identity"
 import { navGroups } from "@/lib/nav"
+import { modelName, useAiStatus } from "@/lib/ai/client"
 import { useShell } from "@/lib/shell"
 import { cn } from "@/lib/utils"
 
@@ -135,7 +136,8 @@ function AssistantCard({ className }: { className?: string }) {
 
 function StatusRow({ compact }: { compact: boolean }) {
   const { t, locale, setLocale } = useT()
-  const shell = useShell()
+  const ai = useAiStatus()
+  const on = !!ai?.enabled
   const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -144,10 +146,12 @@ function StatusRow({ compact }: { compact: boolean }) {
     <div className={cn("flex flex-col gap-2 px-1", compact && "items-center lg:items-stretch")}>
       <span className={cn("items-center gap-2 text-xs text-muted-foreground", compact ? "hidden lg:flex" : "flex")}>
         <span
-          className={cn("size-2 rounded-full", shell.ai.enabled ? "bg-primary" : "bg-muted-foreground/50")}
+          className={cn("size-2 rounded-full", on ? "bg-primary" : "bg-muted-foreground/50")}
           aria-hidden
         />
-        {shell.ai.enabled ? t("ai.on", { models: "Haiku/Sonnet" }) : t("ai.off.short")}
+        {on && ai
+          ? t(ai.mock ? "ai.on.mock" : "ai.on", { models: `${modelName(ai.models.fast)}/${modelName(ai.models.deep)}` })
+          : t("ai.off.short")}
       </span>
       <div className={cn("flex items-center gap-2", compact && "flex-col lg:flex-row")}>
         <div role="radiogroup" aria-label={t("lang.label")} className="inline-flex rounded-lg border border-border bg-card p-0.5">

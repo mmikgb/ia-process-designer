@@ -49,6 +49,7 @@ export const en: Record<Key, string> = {
   "assistant.cta": "Ask",
   "assistant.soon": "The assistant arrives in phase 4. Meanwhile, use search (⌘K).",
   "ai.on": "AI on · {models}",
+  "ai.on.mock": "Mock AI · {models}",
   "ai.off.short": "AI off",
   "ai.off": "AI off: showing the automatic version",
   "lang.label": "Language",
