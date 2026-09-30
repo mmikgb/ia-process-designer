@@ -63,7 +63,7 @@ built in 12.4s  sha=87d65045a1c70b18
   doctors 5571  escalations 475  specialists 18
   spc charts 4  watchlist 954  themes 24
   data-quality findings 7
-  llm: AI features are switched off in settings   full enrichment would cost $1.754
+  llm: AI features are switched off in settings   full enrichment would cost $1.88
 ```
 
 ## Things worth demoing deliberately
@@ -109,5 +109,5 @@ that passed.
 - **Pulse screen not built.** `series.py` produces the data; the brushable screen is not there.
 - **Bundle is 23 MB** — mostly the 29,846 interactions. Loads in about a second, cached.
 - **No tickets, no phone.** Half of farming is reactive and the queue is blind to it.
-- **LLM enrichment not yet baked.** $1.75 one-off, from the Settings screen. Until then the
+- **LLM enrichment not yet baked.** $1.88 one-off, from the Settings screen. Until then the
   themes are the rules version, which is the deterministic path by design.

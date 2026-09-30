@@ -157,6 +157,7 @@ def build(xlsx: Path | None = None, use_llm: bool = True, cache: bool = True) ->
         "kpi": kpi.build(t, doc, esc, ser, asof),
         "scopes": kpi.scopes(t, doc, esc, asof),
         "team": kpi.team(t, doc, esc, asof),
+        "pulse": series.pulse(t, ser, P.RULES["extract_date"], ROOT / "config" / "events.csv"),
         "predict": forecast.build(t, doc, tagged, ser, asof),
         "insights": insight.build(t, doc, tagged, use_llm=use_llm),
         "llm": {"enabled": llm.enabled()[0], "reason": llm.enabled()[1],
@@ -213,6 +214,20 @@ def web_view(b: dict, top: int = 12) -> dict:
         # few points a day to hold limits.
         "spc": b["spc"],
         "team": b["team"],
+        "pulse": b["pulse"],
+        # What the AI layer would cost, and whether it is on. Live spend is in the
+        # ledger on the machine that makes the calls (out/llm_ledger.db), not here.
+        "cost": {
+            "enabled": b["llm"]["enabled"],
+            "reason": b["llm"]["reason"],
+            "estimate": b["llm"]["estimate"],
+            "prices": llm.PRICES,
+            "batch_discount": llm.BATCH_DISCOUNT,
+            "monthly_budget_usd": llm.settings().get("monthly_budget_usd"),
+            "notes_total": b["meta"]["row_counts"].get("interactions"),
+            "farming_specialists": sum(1 for s in b["specialists"]
+                                       if s.get("role") == "Farming Specialist"),
+        },
         "predict": {
             "ceiling": b["predict"]["ceiling"],
             "lead_times": b["predict"]["lead_times"],

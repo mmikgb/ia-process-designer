@@ -7,13 +7,15 @@ import { cn } from "@/lib/utils"
 const LINKS = [
   { href: "/", label: "Overview", hint: "Where to act" },
   { href: "/team", label: "My team", hint: "Where is the work, who needs help?" },
+  { href: "/pulse", label: "Pulse", hint: "What has been happening day by day?" },
   { href: "/control", label: "Control", hint: "Real change or noise?" },
+  { href: "/cost", label: "Cost", hint: "What does the AI cost?" },
 ]
 
 export function SiteNav() {
   const path = usePathname()
   return (
-    <nav aria-label="Screens" className="flex gap-1">
+    <nav aria-label="Screens" className="flex flex-wrap gap-1">
       {LINKS.map((l) => {
         const on = l.href === "/" ? path === "/" : path.startsWith(l.href)
         return (

@@ -180,8 +180,30 @@ export interface OverviewData {
   scopes: Record<string, Scope>
   spc: Record<string, SpcChart>
   team: Team
+  pulse: Pulse
+  cost: Cost
   predict: Predict
   watchlist: Watchlist
+}
+
+export interface Cost {
+  enabled: boolean
+  reason: string
+  estimate: {
+    unique_notes_all: number
+    unique_notes_untagged: number
+    tokens_all: number
+    tokens_untagged: number
+    themes_usd: number
+    summaries_doctors: number
+    summaries_usd: number
+    total_usd: number
+  }
+  prices: Record<string, { in: number; out: number }>
+  batch_discount: number
+  monthly_budget_usd: number | null
+  notes_total: number | null
+  farming_specialists: number
 }
 
 /** One doctor, as the panel shows it. Written per owner by bundle.py (out/doctors/<owner>.json). */
@@ -252,4 +274,21 @@ export interface Team {
   target_min: number
   min_escalations: number
   unowned: { n: number; by_queue: Record<string, number> }
+}
+
+export interface PulseRow {
+  key: string
+  label: string
+  unit: "per day" | "rate"
+  points: { date: string; n: number | null; r7: number | null }[]
+  zero_days?: string[]
+  zero_pattern?: string | null
+}
+
+export interface Pulse {
+  end: string
+  rows: PulseRow[]
+  events: { date: string; label: string; kind: string }[]
+  bookings_monthly: { month: string; patient_bookings: number; doctors: number; per_doctor: number }[]
+  note: string
 }

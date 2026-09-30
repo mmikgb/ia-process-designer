@@ -22,10 +22,11 @@ LEDGER = OUT / "llm_ledger.db"
 SETTINGS = OUT / "settings.json"
 
 # $ per million tokens. Source: platform.claude.com/docs/en/about-claude/pricing
+# (checked 2026-09-30; batch is 50% of these)
 PRICES = {
     "claude-haiku-4-5":  {"in": 1.0, "out": 5.0},
-    "claude-sonnet-4-5": {"in": 2.0, "out": 10.0},
-    "claude-opus-4-5":   {"in": 4.0, "out": 20.0},
+    "claude-sonnet-4-5": {"in": 3.0, "out": 15.0},
+    "claude-opus-4-5":   {"in": 5.0, "out": 25.0},
 }
 DEFAULT_MODEL = "claude-haiku-4-5"
 BATCH_DISCOUNT = 0.5
