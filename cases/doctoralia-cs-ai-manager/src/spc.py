@@ -13,6 +13,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from i18n import L
+
 BASELINE = ("2026-03-01", "2026-06-30")
 D2 = 1.128  # d2 for a moving range of n=2, the standard XmR constant
 
@@ -110,17 +112,21 @@ def stability(chart: dict) -> dict:
     b = chart["baseline"]
     pts = [p for p in chart["points"] if b["from"] <= p["period"] <= b["to"]]
     if not pts:
-        return {"stable": None, "note": "no baseline points"}
+        return {"stable": None, "note": L("no baseline points", "sin puntos en la línea base")}
     out = sum(1 for p in pts if p["signals"])
     frac = out / len(pts)
     return {
         "stable": bool(frac <= 0.10),
         "baseline_out_of_control": round(frac, 3),
-        "note": ("Baseline is stable; limits are meaningful."
+        "note": (L("Baseline is stable; limits are meaningful.",
+                   "La línea base es estable; los límites significan algo.")
                  if frac <= 0.10 else
-                 f"{frac:.0%} of baseline points are out of control. This process was not stable "
-                 "during the baseline window, so treat these limits as descriptive, not as an alarm "
-                 "threshold. Investigate the process before acting on single points."),
+                 L(f"{frac:.0%} of baseline points are out of control. This process was not stable "
+                   "during the baseline window, so treat these limits as descriptive, not as an alarm "
+                   "threshold. Investigate the process before acting on single points.",
+                   f"El {frac:.0%} de los puntos de la línea base está fuera de control. El proceso no "
+                   "era estable en esa ventana, así que estos límites describen, no alarman. Revisa el "
+                   "proceso antes de actuar sobre un punto suelto.")),
     }
 
 
@@ -142,14 +148,32 @@ def build(t: dict, ser: dict) -> dict:
 
     charts = {
         "onboarding_grade_d_daily": p_chart(daily_d, "date", "d", "n",
-                                            "Grade-D rate on onboardings closed, daily"),
+                                            L("Grade-D rate on onboardings closed, daily",
+                                              "Tasa de grado D en onboardings cerrados, diaria")),
         "escalations_daily": c_chart(daily_e, "date", "n",
-                                     "Escalations raised per day"),
+                                     L("Escalations raised per day", "Escalaciones por día")),
         "pickup_weekly": xmr(w_esc, "period", "median_pickup",
-                             "Median escalation pickup, minutes, weekly", floor=0),
+                             L("Median escalation pickup, minutes, weekly",
+                               "Mediana de atención de escalaciones, minutos, semanal"), floor=0),
         "onboarding_score_weekly": xmr(w_onb, "period", "avg_score",
-                                       "Average onboarding score, weekly", floor=0),
+                                       L("Average onboarding score, weekly",
+                                         "Calificación promedio de onboarding, semanal"), floor=0),
     }
+    from pipeline import RULES
     for c in charts.values():
         c["stability"] = stability(c)
+        c["finding"] = finding(c, RULES["extract_date"])
     return charts
+
+
+def finding(chart: dict, asof: str, days: int = 28) -> dict:
+    """The chart's headline: a signal in the last `days` days, or none. Only a point the
+    rules flag counts as a real change; everything else is normal variation."""
+    since = str((pd.Timestamp(asof) - pd.Timedelta(days=days)).date())
+    k = sum(1 for p in chart["points"] if p["period"] >= since and p["signals"])
+    if not k:
+        return L(f"No real change in the last {days} days: every point is inside the limits.",
+                 f"Sin cambio real en los últimos {days} días: todos los puntos están dentro de los límites.")
+    s = "s" if k > 1 else ""
+    return L(f"{k} point{s} outside the normal range in the last {days} days: worth a question.",
+             f"{k} punto{s} fuera del rango normal en los últimos {days} días: vale la pena preguntar.")

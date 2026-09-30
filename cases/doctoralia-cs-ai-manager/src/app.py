@@ -17,6 +17,7 @@ import draft as D
 import viz as V
 import llm
 import state as S
+from i18n import en
 
 ROOT = Path(__file__).resolve().parent.parent
 st.set_page_config(page_title="CS Control Room", layout="wide", page_icon="◆")
@@ -344,9 +345,9 @@ elif screen == "Control":
     st.caption("Is this movement real, or is it noise? Frozen baseline, Western Electric rules 1, 2 and 4.")
     for key, ch in b["spc"].items():
         stb = ch["stability"]
-        st.subheader(ch["label"])
+        st.subheader(en(ch["label"]))
         if stb["stable"] is False:
-            st.warning("⚠ " + stb["note"])
+            st.warning("⚠ " + en(stb["note"]))
         st.plotly_chart(V.control(ch, DARK), use_container_width=True, key=f"spc_{key}")
         fired = [p for p in ch["points"] if p["signals"]]
         c1, c2 = st.columns([1, 3])

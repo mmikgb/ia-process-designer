@@ -1,5 +1,8 @@
 "use client"
 
+// One control chart: the value, the frozen-baseline centre and limits, and the points a
+// rule flagged, in amber only. The title is the chart's finding (spc.finding, from Python);
+// every value, limit and flag comes from spc.py.
 import { AlertTriangle, CheckCircle2 } from "lucide-react"
 import {
   CartesianGrid,
@@ -14,54 +17,30 @@ import {
 } from "recharts"
 import { ExplainButton } from "@/components/ai/explain"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useT, type Key } from "@/lib/i18n"
 import type { SpcChart, SpcPoint } from "@/lib/types"
 
-export const RULE_LABEL: Record<string, string> = {
-  rule1: "Beyond the 3σ limits",
-  rule2: "2 of 3 beyond 2σ, same side",
-  rule3: "8 in a row on one side of the centre",
-}
-
-const KIND: Record<SpcChart["chart"], string> = {
-  p: "p-chart · limits move with each day's n",
-  c: "c-chart · Poisson limits for a daily count",
-  xmr: "XmR · one value per week",
-}
+export const RULES = ["rule1", "rule2", "rule3"] as const
 
 export type Fmt = (v: number) => string
 
-function shortDate(period: string) {
-  return new Date(`${period.slice(0, 10)}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" })
-}
-
-function SpcTooltip({
-  active,
-  payload,
-  fmt,
-  center,
-}: {
-  active?: boolean
-  payload?: { payload: SpcPoint }[]
-  fmt: Fmt
-  center: number
-}) {
+function SpcTooltip({ active, payload, fmt, center }: { active?: boolean; payload?: { payload: SpcPoint }[]; fmt: Fmt; center: number }) {
+  const { t, day } = useT()
   if (!active || !payload?.length) return null
   const p = payload[0].payload
   return (
-    <div className="max-w-64 rounded-lg border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md">
-      <p className="font-medium">{shortDate(p.period)}</p>
-      <p className="tabular-nums">
+    <div className="flex max-w-64 flex-col gap-0.5 rounded-xl bg-foreground px-3 py-2.5 text-xs text-background shadow-lg">
+      <span className="font-semibold">{day(p.period)}</span>
+      <span className="tabular-nums">
         {fmt(p.value)}
-        {p.n != null && <span className="text-muted-foreground"> · n={p.n}</span>}
-      </p>
-      <p className="tabular-nums text-muted-foreground">
-        limits {fmt(p.lcl)} – {fmt(p.ucl)} · centre {fmt(center)}
-      </p>
+        {p.n != null && <span className="text-background/70"> · n={p.n}</span>}
+      </span>
+      <span className="text-background/70 tabular-nums">{t("control.tip.limits", { a: fmt(p.lcl), b: fmt(p.ucl), c: fmt(center) })}</span>
       {p.signals.length > 0 && (
-        <ul className="mt-1 flex flex-col gap-0.5 font-medium text-warning">
+        <ul className="mt-1 flex flex-col gap-0.5 font-medium text-[#f5b94a]">
           {p.signals.map((s) => (
             <li key={s}>
-              ▲ {RULE_LABEL[s] ?? s} ({p.value > center ? "above" : "below"} centre)
+              ▲ {t(`control.rule.${s}` as Key)} ({t(p.value > center ? "control.above" : "control.below")})
             </li>
           ))}
         </ul>
@@ -70,37 +49,39 @@ function SpcTooltip({
   )
 }
 
-export function ControlChart({ chart, fmt, reading, chartKey }: { chart: SpcChart; fmt: Fmt; reading: string; chartKey?: string }) {
+export function ControlChart({ chart, fmt, reading, chartKey }: { chart: SpcChart; fmt: Fmt; reading: string; chartKey: string }) {
+  const { t, tx, pct, day } = useT()
   const flagged = chart.points.filter((p) => p.signals.length)
   const first = chart.points[0]?.period
   const baseEnd = [...chart.points].reverse().find((p) => p.period.slice(0, 10) <= chart.baseline.to)?.period
+  const label = tx(chart.label)
 
   return (
-    <Card>
+    <Card data-chart={chartKey}>
       <CardHeader className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <CardTitle>{chart.label}</CardTitle>
-          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            {KIND[chart.chart]}
-            {chartKey && <ExplainButton kind="spc" itemKey={chartKey} label={chart.label} />}
-          </span>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">{label}</span>
+            <CardTitle className="text-base leading-snug text-pretty">{chart.finding ? tx(chart.finding) : label}</CardTitle>
+          </div>
+          <ExplainButton kind="spc" itemKey={chartKey} label={label} className="-mt-1 -mr-2" />
         </div>
         <p className="text-sm text-muted-foreground text-pretty">{reading}</p>
         {chart.stability.stable ? (
           <p className="flex items-start gap-2 text-sm text-foreground">
             <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
-            Stable during the baseline, so a flagged point here is worth a question.
+            {t("control.stable")}
           </p>
         ) : (
-          <p className="flex items-start gap-2 rounded-lg bg-warning/10 px-3 py-2 text-sm text-foreground text-pretty">
+          <p className="flex items-start gap-2 rounded-lg bg-chip-amber px-3 py-2 text-sm text-foreground text-pretty">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
             <span>
-              <span className="font-medium">Not stable in the baseline</span> (
-              {Math.round(chart.stability.baseline_out_of_control * 100)}% of baseline points flagged). Read the limits
-              as a description, not an alarm threshold.
+              <span className="font-medium">{t("control.unstable")}</span>{" "}
+              {t("control.unstable.body", { p: pct(chart.stability.baseline_out_of_control) })}
             </span>
           </p>
         )}
+        <span className="text-xs text-muted-foreground">{t(`control.kind.${chart.chart}` as Key)}</span>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <div className="h-64 w-full">
@@ -114,25 +95,11 @@ export function ControlChart({ chart, fmt, reading, chartKey }: { chart: SpcChar
                   fill="var(--color-muted-foreground)"
                   fillOpacity={0.07}
                   ifOverflow="extendDomain"
-                  label={{ value: "frozen baseline", position: "insideTopLeft", fontSize: 11, fill: "var(--color-muted-foreground)" }}
+                  label={{ value: t("control.baseline"), position: "insideTopLeft", fontSize: 11, fill: "var(--color-muted-foreground)" }}
                 />
               )}
-              <XAxis
-                dataKey="period"
-                tickFormatter={shortDate}
-                tickLine={false}
-                axisLine={false}
-                minTickGap={32}
-                tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
-              />
-              <YAxis
-                tickFormatter={fmt}
-                tickLine={false}
-                axisLine={false}
-                width={60}
-                tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
-                domain={["auto", "auto"]}
-              />
+              <XAxis dataKey="period" tickFormatter={(p: string) => day(p)} tickLine={false} axisLine={false} minTickGap={32} tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }} />
+              <YAxis tickFormatter={fmt} tickLine={false} axisLine={false} width={60} tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }} domain={["auto", "auto"]} />
               <Tooltip content={<SpcTooltip fmt={fmt} center={chart.center} />} cursor={{ stroke: "var(--color-border)" }} />
               <ReferenceLine y={chart.center} stroke="var(--color-muted-foreground)" strokeWidth={1} />
               <Line dataKey="ucl" type="stepAfter" stroke="var(--color-muted-foreground)" strokeDasharray="4 3" strokeWidth={1} dot={false} activeDot={false} isAnimationActive={false} />
@@ -146,7 +113,7 @@ export function ControlChart({ chart, fmt, reading, chartKey }: { chart: SpcChar
                 activeDot={{ r: 4 }}
                 dot={(d: { cx?: number; cy?: number; index?: number; payload?: SpcPoint }) =>
                   d.payload?.signals.length && d.cx != null && d.cy != null ? (
-                    // Flagged points: amber, bigger, ringed in the surface so they separate from the line.
+                    // flagged points: amber only, ringed in the surface so they separate from the line
                     <circle key={`s${d.index}`} cx={d.cx} cy={d.cy} r={4.5} fill="var(--color-chart-2)" stroke="var(--color-card)" strokeWidth={2} />
                   ) : (
                     <g key={`d${d.index}`} />
@@ -159,50 +126,46 @@ export function ControlChart({ chart, fmt, reading, chartKey }: { chart: SpcChar
 
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            <span className="h-0.5 w-4 rounded bg-chart-1" /> value
+            <span className="h-0.5 w-4 rounded bg-chart-1" /> {t("control.legend.value")}
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-px w-4 border-t border-dashed border-muted-foreground" /> control limits
+            <span className="h-px w-4 border-t border-dashed border-muted-foreground" /> {t("control.legend.limits")}
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-px w-4 bg-muted-foreground" /> centre ({fmt(chart.center)})
+            <span className="h-px w-4 bg-muted-foreground" /> {t("control.legend.center", { v: fmt(chart.center) })}
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="size-2.5 rounded-full bg-chart-2" /> signal ({flagged.length})
+            <span className="size-2.5 rounded-full bg-chart-2" /> {t("control.legend.signal", { n: flagged.length })}
           </span>
-          <span>
-            baseline {chart.baseline.from} → {chart.baseline.to}, frozen
-          </span>
+          <span>{t("control.legend.baseline", { a: day(chart.baseline.from), b: day(chart.baseline.to) })}</span>
         </div>
 
-        <details className="group rounded-lg border border-border">
-          <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-foreground">
-            Show the flagged points ({flagged.length})
-          </summary>
+        <details className="rounded-lg border border-border">
+          <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-foreground">{t("control.flagged", { n: flagged.length })}</summary>
           {flagged.length === 0 ? (
-            <p className="px-3 pb-3 text-sm text-muted-foreground">No point fired a rule.</p>
+            <p className="px-3 pb-3 text-sm text-muted-foreground">{t("control.flagged.none")}</p>
           ) : (
             <div className="overflow-x-auto px-3 pb-3">
               <table className="w-full text-sm tabular-nums">
                 <thead>
                   <tr className="text-left text-xs text-muted-foreground">
-                    <th className="py-1 pr-3 font-medium">Date</th>
-                    <th className="py-1 pr-3 font-medium">Value</th>
-                    <th className="py-1 pr-3 font-medium">Limits</th>
-                    <th className="py-1 font-medium">Rule</th>
+                    <th className="py-1 pr-3 font-medium">{t("control.col.date")}</th>
+                    <th className="py-1 pr-3 font-medium">{t("control.col.value")}</th>
+                    <th className="py-1 pr-3 font-medium">{t("control.col.limits")}</th>
+                    <th className="py-1 font-medium">{t("control.col.rule")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {flagged.map((p) => (
                     <tr key={p.period} className="border-t border-border">
-                      <td className="py-1 pr-3">{p.period.slice(0, 10)}</td>
+                      <td className="py-1 pr-3">{day(p.period)}</td>
                       <td className="py-1 pr-3">
-                        {fmt(p.value)} <span className="text-xs text-muted-foreground">{p.value > chart.center ? "above" : "below"}</span>
+                        {fmt(p.value)} <span className="text-xs text-muted-foreground">{t(p.value > chart.center ? "control.above" : "control.below")}</span>
                       </td>
                       <td className="py-1 pr-3 text-muted-foreground">
                         {fmt(p.lcl)} – {fmt(p.ucl)}
                       </td>
-                      <td className="py-1">{p.signals.map((s) => RULE_LABEL[s] ?? s).join("; ")}</td>
+                      <td className="py-1">{p.signals.map((s) => t(`control.rule.${s}` as Key)).join("; ")}</td>
                     </tr>
                   ))}
                 </tbody>

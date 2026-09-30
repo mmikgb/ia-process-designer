@@ -141,12 +141,14 @@ export interface SpcPoint {
 
 export interface SpcChart {
   chart: "p" | "c" | "xmr"
-  label: string
+  label: Text
+  /** the headline: a signal in the last 28 days, or none (spc.finding) */
+  finding?: Text
   center: number
   sigma?: number
   baseline: { from: string; to: string; frozen: boolean; n_points: number }
   points: SpcPoint[]
-  stability: { stable: boolean; baseline_out_of_control: number; note: string }
+  stability: { stable: boolean; baseline_out_of_control: number; note: Text }
 }
 
 export interface LeadTime {
@@ -185,6 +187,18 @@ export interface Predict {
   }
 }
 
+/** One note theme on Señales (bundle web_view "themes", from insight.rules_themes). */
+export interface Theme {
+  tag: string
+  label: Text
+  notes: number
+  doctors: number
+  churn: number
+  lift: number
+  trend: { month: string; n: number }[]
+  examples: string[]
+}
+
 export interface OverviewData {
   meta: Meta
   rules: Rules
@@ -199,6 +213,7 @@ export interface OverviewData {
   team: Team
   pulse: Pulse
   cost: Cost
+  themes?: Theme[]
   predict: Predict
   watchlist: Watchlist
 }
@@ -398,17 +413,19 @@ export interface Team {
 
 export interface PulseRow {
   key: string
-  label: string
+  label: Text
   unit: "per day" | "rate"
   points: { date: string; n: number | null; r7: number | null }[]
   zero_days?: string[]
-  zero_pattern?: string | null
+  zero_pattern?: Text | null
+  /** the headline: the last 7-day average against four weeks earlier (series._finding) */
+  finding?: Text | null
 }
 
 export interface Pulse {
   end: string
   rows: PulseRow[]
-  events: { date: string; label: string; kind: string }[]
+  events: { date: string; label: Text; kind: string }[]
   bookings_monthly: { month: string; patient_bookings: number; doctors: number; per_doctor: number }[]
-  note: string
+  note: Text
 }

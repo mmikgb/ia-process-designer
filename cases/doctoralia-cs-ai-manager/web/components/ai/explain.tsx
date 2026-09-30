@@ -20,7 +20,7 @@ export function ExplainButton({
   label,
   className,
 }: {
-  kind: "kpi" | "spc" | "team_row" | "signal"
+  kind: "kpi" | "spc" | "team_row" | "signal" | "pulse"
   itemKey: string
   scope?: string
   period?: string

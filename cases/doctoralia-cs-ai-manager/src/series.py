@@ -8,6 +8,8 @@ monthly in the source and stay monthly.
 from __future__ import annotations
 import pandas as pd
 
+from i18n import L
+
 DAILY_OK = ["interactions", "enrollments", "onboardings_started", "onboardings_closed"]
 
 
@@ -65,13 +67,34 @@ def build(t: dict) -> dict:
                   "onboardings_started": r(d_start), "onboardings_closed": r(d_close),
                   "escalations": r(_daily(esc.escalated_at))},
         "weekly": {"escalations": r(w_esc), "onboardings": r(w_onb)},
-        "note": ("Bookings are monthly in the source system — five complete months exist "
-                 "(Apr-Aug 2026). There is no daily or weekly booking series to draw. "
-                 "Escalations average 3/day, so rates are weekly; the daily series is counts only."),
+        "note": L("Bookings are monthly in the source system — five complete months exist "
+                  "(Apr-Aug 2026). There is no daily or weekly booking series to draw. "
+                  "Escalations average 3/day, so rates are weekly; the daily series is counts only.",
+                  "Las citas son mensuales en el sistema de origen: hay cinco meses completos "
+                  "(abr-ago 2026). No existe una serie diaria ni semanal de citas que dibujar. "
+                  "Las escalaciones promedian 3 al día, así que las tasas son semanales; la serie "
+                  "diaria son solo conteos."),
     }
 
 
 # ---- Pulse: daily series ready to draw -------------------------------------
+
+def _finding(r7: list, rate: bool, decimals: int = 0, weeks: int = 4) -> dict | None:
+    """The row's headline: the last 7-day average against the one `weeks` weeks earlier.
+    Within ±5% it is "about the same"; whether a move is real is the Control screen's job."""
+    vals = [v for v in r7 if v is not None]
+    if len(vals) <= weeks * 7:
+        return None
+    a, b = vals[-1], vals[-1 - weeks * 7]
+    fmt = (lambda v: f"{100 * v:.0f}%") if rate else (lambda v: f"{v:.{decimals}f}")
+    per = "" if rate else ("/day", " al día")
+    if b and abs(a - b) / abs(b) <= 0.05:
+        return L(f"{fmt(a)}{per[0] if per else ''} on the 7-day average, about the same as {weeks} weeks ago",
+                 f"{fmt(a)}{per[1] if per else ''} en el promedio de 7 días, casi igual que hace {weeks} semanas")
+    up = a > b
+    return L(f"{fmt(a)}{per[0] if per else ''} on the 7-day average, {'up' if up else 'down'} from {fmt(b)} {weeks} weeks ago",
+             f"{fmt(a)}{per[1] if per else ''} en el promedio de 7 días, {'arriba' if up else 'abajo'} de {fmt(b)} hace {weeks} semanas")
+
 
 def _filled(rows: list[dict], end: str, value="n") -> list[dict]:
     """Every day between the series' first and last recorded date. A gap inside
@@ -96,11 +119,11 @@ def pulse(t: dict, ser: dict, end: str, events_csv) -> dict:
     d = ser["daily"]
     rows = []
     for key, label, src in [
-        ("interactions", "Interactions logged", "interactions"),
-        ("enrollments", "Campaign enrollments", "enrollments"),
-        ("onboardings_started", "Onboardings started", "onboardings_started"),
-        ("onboardings_closed", "Onboardings closed", "onboardings_closed"),
-        ("escalations", "Escalations raised (count only)", "escalations"),
+        ("interactions", L("Interactions logged", "Interacciones registradas"), "interactions"),
+        ("enrollments", L("Campaign enrollments", "Inscripciones a campañas"), "enrollments"),
+        ("onboardings_started", L("Onboardings started", "Onboardings iniciados"), "onboardings_started"),
+        ("onboardings_closed", L("Onboardings closed", "Onboardings cerrados"), "onboardings_closed"),
+        ("escalations", L("Escalations raised (count only)", "Escalaciones (solo conteo)"), "escalations"),
     ]:
         pts = _filled(d[src], end)
         r7 = _roll([p["n"] for p in pts])
@@ -112,8 +135,11 @@ def pulse(t: dict, ser: dict, end: str, events_csv) -> dict:
                      # zero days inside the span; when they all fall on the same
                      # days of the month it is how the extract was made, not a pause
                      "zero_days": zeros,
-                     "zero_pattern": (f"all on day {dom[0]}-{dom[-1]} of a month"
+                     "zero_pattern": (L(f"all on day {dom[0]}-{dom[-1]} of a month",
+                                        f"todos en los días {dom[0]}-{dom[-1]} del mes")
                                       if zeros and len(dom) <= 3 and dom[0] >= 28 else None)})
+        rows[-1]["finding"] = _finding([p["r7"] for p in rows[-1]["points"]], rate=False,
+                                       decimals=1 if key == "escalations" else 0)
 
     # engagement is a rate: weight the 7-day window by volume, never average daily rates
     enr = pd.DataFrame(d["enrollments"]).set_index("date")
@@ -121,9 +147,12 @@ def pulse(t: dict, ser: dict, end: str, events_csv) -> dict:
     n = enr.n.reindex(idx, fill_value=0)
     eng = (enr.n * enr.engaged_rate).reindex(idx, fill_value=0)
     rate = (eng.rolling(7, min_periods=7).sum() / n.rolling(7, min_periods=7).sum())
-    rows.insert(2, {"key": "engagement", "label": "Campaign engagement rate, 7-day", "unit": "rate",
-                    "points": [{"date": i, "n": None, "r7": None if pd.isna(v) else round(float(v), 4)}
-                               for i, v in zip(idx, rate)]})
+    eng_pts = [{"date": i, "n": None, "r7": None if pd.isna(v) else round(float(v), 4)}
+               for i, v in zip(idx, rate)]
+    rows.insert(2, {"key": "engagement",
+                    "label": L("Campaign engagement rate, 7-day", "Tasa de respuesta a campañas, 7 días"),
+                    "unit": "rate", "points": eng_pts,
+                    "finding": _finding([p["r7"] for p in eng_pts], rate=True)})
 
     # events: the hand-kept file plus facts the data already dates
     ev = []
@@ -135,8 +164,9 @@ def pulse(t: dict, ser: dict, end: str, events_csv) -> dict:
         pass
     first = t["campaign_enrollments"].groupby("campaign_id").enrolled_at.min()
     asks = t["campaigns"].set_index("campaign_id").ask
-    ev += [{"date": str(v.date()), "label": f"{k} starts: {asks.get(k, '')}", "kind": "campaign"}
-           for k, v in first.items()]
+    # the campaign's ask is data (as written in the source), not translated
+    ev += [{"date": str(v.date()), "label": L(f"{k} starts: {asks.get(k, '')}", f"Inicia {k}: {asks.get(k, '')}"),
+            "kind": "campaign"} for k, v in first.items()]
 
     bk = t["bookings_monthly"]
     months = (bk.groupby("month").agg(patient_bookings=("patient_bookings", "sum"),

@@ -62,7 +62,7 @@ function managerContext(i: BriefingInput) {
   return {
     scope: i.scope === "all" ? T(i.locale, "whole portfolio", "toda la cartera") : i.scope.slice(5),
     kpis: kpiBlock(i.scope, i.locale),
-    control_charts: spcSummary(O.meta.extract_date),
+    control_charts: spcSummary(O.meta.extract_date, i.locale),
     rules: RULES(),
     definitions: { ...DEFINITIONS, control_chart: "límites a 3 sigma sobre una línea base congelada; una señal es un punto fuera o una racha (reglas de Western Electric)" },
   }

@@ -10,7 +10,7 @@ export const metadata = { title: "Pulse · CS Control Room" }
 export default function Page() {
   return (
     <Framed title="nav.pulse" subtitle="pulse.subtitle">
-      <PulseScreen data={data} />
+      <PulseScreen pulse={data.pulse} />
     </Framed>
   )
 }

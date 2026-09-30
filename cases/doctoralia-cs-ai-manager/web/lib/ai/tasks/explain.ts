@@ -7,7 +7,7 @@ import type { TaskSpec } from "@/lib/ai/gateway"
 import type { Locale } from "@/lib/tx"
 
 export const ExplainInput = z.object({
-  kind: z.enum(["kpi", "spc", "team_row", "signal"]),
+  kind: z.enum(["kpi", "spc", "team_row", "signal", "pulse"]),
   key: z.string().max(60),
   scope: z.string().regex(/^(all|team:[\w ]+|S\d+)$/).default("all"),
   period: z.string().regex(/^\d+$/).default("30"),
@@ -31,7 +31,7 @@ const pct = (v: number) => `${Math.round(v * 1000) / 10}%`
 
 async function context(i: ExplainInput) {
   const base = { rules: RULES(), definitions: DEFINITIONS, min_n_for_a_rate: 10 }
-  const charts = spcSummary(O.meta.extract_date)
+  const charts = spcSummary(O.meta.extract_date, i.locale)
   if (i.kind === "kpi") {
     const periods = (O.scopes[i.scope] ?? O.scopes.all).periods
     const k = kpiBlock(i.scope, i.locale)
@@ -46,7 +46,36 @@ async function context(i: ExplainInput) {
   }
   if (i.kind === "spc") {
     const c = O.spc[i.key]
-    return { ...base, block: charts.find((x) => x.key === i.key) ?? null, baseline: c?.baseline ?? null, stability_note: c?.stability.note ?? null }
+    const note = c?.stability.note
+    return {
+      ...base,
+      block: charts.find((x) => x.key === i.key) ?? null,
+      baseline: c?.baseline ?? null,
+      stability_note: note && typeof note === "object" ? note[i.locale] : (note ?? null),
+    }
+  }
+  if (i.kind === "pulse") {
+    const tx = (v: unknown) => (v && typeof v === "object" ? (v as Record<string, string>)[i.locale] : (v as string | null))
+    const row = O.pulse.rows.find((r) => r.key === i.key)
+    const r7 = row ? row.points.filter((p) => p.r7 != null) : []
+    const last = r7[r7.length - 1]
+    const before = r7[r7.length - 1 - 28]
+    return {
+      ...base,
+      block: row
+        ? {
+            label: tx(row.label),
+            unit: row.unit,
+            finding: tx(row.finding ?? null),
+            last_7day_average: last ? { date: last.date, value: last.r7 } : null,
+            four_weeks_earlier: before ? { date: before.date, value: before.r7 } : null,
+            zero_days: row.zero_days?.length ?? 0,
+            zero_pattern: tx(row.zero_pattern ?? null),
+          }
+        : null,
+      note: tx(O.pulse.note),
+      rule: T(i.locale, "Pulse only describes; whether a move is real is decided on the Control screen.", "Pulse solo describe; si un movimiento es real se decide en Control."),
+    }
   }
   if (i.kind === "team_row") {
     const row = O.team.rows.find((r) => r.id === i.key)
@@ -85,6 +114,11 @@ function fallback(ctx: unknown, i: ExplainInput): string {
     return n
       ? T(L, `${n} point(s) outside the normal range in the last 28 days: worth a question.`, `${n} punto(s) fuera del rango normal en los últimos 28 días: vale la pena preguntar.`) + ` ${c.stability_note ?? ""}`
       : T(L, "No signal in the last 28 days: normal variation.", "Sin señales en los últimos 28 días: variación normal.") + ` ${c.stability_note ?? ""}`
+  }
+  if (i.kind === "pulse") {
+    return [String(b.finding ?? b.label ?? ""), T(L, "Whether that is a real change is the Control screen's job.", "Si es un cambio real lo decide la pantalla de Control.")]
+      .filter(Boolean)
+      .join(". ")
   }
   if (i.kind === "team_row") {
     return T(

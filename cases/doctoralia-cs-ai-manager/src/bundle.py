@@ -22,6 +22,7 @@ import pipeline as P
 import notes as N
 import series, spc, forecast, insight, llm, kpi, dayplan
 import draft as D
+from i18n import L
 
 OUT = ROOT / "out"
 CACHE = OUT / "bundles"
@@ -29,7 +30,7 @@ SCHEMA_VERSION = "1.2"
 # The shape of the web view (overview.json, queue/, doctors/, search.json). Bump it whenever
 # the web app starts to need a field; web/scripts/sync-data.mjs refuses to copy an out/ with
 # a lower number over the committed data (a stale out/ used to break /costo silently).
-WEB_SCHEMA = 4
+WEB_SCHEMA = 5
 
 REQUIRED = {
     "doctors": ["doctor_id", "signup_date", "status", "owner_specialist_id",
@@ -256,6 +257,13 @@ def web_view(b: dict, top: int = 12) -> dict:
             "lead_times": b["predict"]["lead_times"],
             "day14": {k: v for k, v in b["predict"]["day14"].items() if k != "worklist"},
         },
+        # Señales: what the notes say, ranked by measured churn lift (insight.rules_themes).
+        # Two example notes each; they are data and stay as written.
+        "themes": [{"tag": th["tag"],
+                    "label": N.THEME_LABELS.get(th["tag"], L(th["name"], th["name"])),
+                    **{k: th[k] for k in ("notes", "doctors", "churn", "lift", "trend")},
+                    "examples": th["examples"][:2]}
+                   for th in b["insights"]["rules_themes"]],
         "watchlist": {"tiers": tiers,
                       "act_now_top": [{k: w[k] for k in keep} for w in act],
                       "items": [{k: w[k] for k in WATCH_FIELDS} for w in wl]},

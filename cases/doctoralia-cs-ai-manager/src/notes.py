@@ -14,6 +14,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from i18n import L
+
 # (tag, priority, regex) — priority orders which signal wins when several fire.
 # Lower number = more urgent. Written in the specialists' own Spanish.
 RULES: list[tuple[str, int, str]] = [
@@ -86,6 +88,34 @@ OPEN_TAGS = [t for t in PRIORITY if t.startswith(("open_task", "needs_help"))] +
             ["hollow_calendar", "churn_threat", "discouraged", "complaint_no_patients",
              "complaint_noshow", "billing_issue"]
 UPSELL_TAGS = [t for t in PRIORITY if t.startswith("upsell")]
+# What each tag means, for the Señales screen (bilingual; the notes themselves are data and
+# stay as written).
+THEME_LABELS = {
+    "churn_threat": L("Said they may cancel", "Dijo que cancelaría"),
+    "discouraged": L("Discouraged with results", "Desanimado con los resultados"),
+    "complaint_no_patients": L("Complained: no patients", "Se quejó: no le llegan pacientes"),
+    "complaint_noshow": L("Complained: patient no-shows", "Se quejó: pacientes que no llegan"),
+    "upsell_payments": L("Interested in Doctoralia Payments", "Interés en Doctoralia Payments"),
+    "open_task_prices": L("Prices missing from the profile", "Faltan precios en el perfil"),
+    "open_task_photo": L("Profile photo missing", "Falta foto de perfil"),
+    "onboarding_no_show": L("Missed an onboarding session", "Faltó a una sesión de onboarding"),
+    "open_task_description": L("Profile description missing", "Falta descripción del perfil"),
+    "positive": L("Positive feedback", "Comentario positivo"),
+    "commitment": L("A commitment was made", "Se hizo un compromiso"),
+    "needs_help_agenda": L("Needs help with the calendar", "Necesita ayuda con la agenda"),
+    "hollow_calendar": L("Calendar too thin", "Agenda muy delgada"),
+    "unreachable": L("Could not be reached", "No se le pudo contactar"),
+    "whatsapp_only": L("Only answers on WhatsApp", "Solo contesta por WhatsApp"),
+    "billing_issue": L("Billing issue", "Problema de facturación"),
+    "needs_help_reviews": L("Needs help with reviews", "Necesita ayuda con opiniones"),
+    "agenda_healthy": L("Calendar in good shape", "Agenda en buen estado"),
+    "multi_site": L("Works at several sites", "Atiende en varias sedes"),
+    "gatekeeper": L("Talks through an assistant", "Se habla con su asistente"),
+    "upsell_first_class": L("Interested in First Class", "Interés en First Class"),
+    "upsell_marketing360": L("Interested in Marketing 360", "Interés en Marketing 360"),
+    "upsell_plan": L("Interested in a higher plan", "Interés en un plan superior"),
+    "upsell_website": L("Interested in their own website", "Interés en sitio web propio"),
+}
 UPSELL_LABELS = {
     "upsell_payments": "Doctoralia Payments",
     "upsell_first_class": "First Class / visibilidad",

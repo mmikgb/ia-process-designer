@@ -10,7 +10,7 @@ export const metadata = { title: "Control · CS Control Room" }
 export default function Page() {
   return (
     <Framed title="nav.control" subtitle="control.subtitle">
-      <ControlScreen data={data} />
+      <ControlScreen spc={data.spc} buckets={data.team.buckets} />
     </Framed>
   )
 }

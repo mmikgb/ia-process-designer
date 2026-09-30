@@ -103,7 +103,8 @@ export function kpiBlock(scope: string, locale: "es" | "en") {
  * The control charts, cut to what a manager briefing needs: centre, the last limits and
  * the signals in the last 28 days. "real" only when a signal is there.
  */
-export function spcSummary(asof: string) {
+export function spcSummary(asof: string, locale: "es" | "en" = "es") {
+  const tx = (v: unknown) => (v && typeof v === "object" ? (v as Record<string, string>)[locale] : (v as string))
   const since = new Date(Date.parse(`${asof}T12:00:00Z`) - 28 * 864e5).toISOString().slice(0, 10)
   return Object.entries(O.spc).map(([key, c]) => {
     const recent = c.points.filter((p) => p.period >= since)
@@ -111,7 +112,7 @@ export function spcSummary(asof: string) {
     const signals = recent.filter((p) => p.signals.length).map((p) => ({ period: p.period, value: p.value, rules: p.signals }))
     return {
       key,
-      label: c.label,
+      label: tx(c.label),
       center: c.center,
       last: last ? { period: last.period, value: last.value, ucl: last.ucl, lcl: last.lcl } : null,
       signals_last_28_days: signals,
