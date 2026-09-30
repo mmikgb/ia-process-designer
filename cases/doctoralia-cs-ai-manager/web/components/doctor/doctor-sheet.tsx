@@ -4,6 +4,7 @@
 // Acción, Análisis IA (phase 4), Historial. Outcomes from the header.
 import { useEffect, useMemo, useState } from "react"
 import { CalendarClock } from "lucide-react"
+import { DoctorAnalysis } from "@/components/ai/analysis"
 import { ActionPanel } from "@/components/doctor/action-panel"
 import { OutcomeMenu, copiedDrafts } from "@/components/today/outcome-menu"
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
@@ -122,7 +123,7 @@ export function DoctorSheet({
                 <ActionPanel doc={doc} onCopied={() => copiedDrafts.add(doc.doctor_id)} />
               </TabsContent>
               <TabsContent value="ai">
-                <p className="rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">{t("sheet.ai.soon")}</p>
+                <DoctorAnalysis doctorId={doc.doctor_id} />
               </TabsContent>
               <TabsContent value="history">
                 <HistoryTab doc={doc} />

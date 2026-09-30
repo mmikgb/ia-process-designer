@@ -64,6 +64,8 @@ export interface TaskSpec<I, O> {
   typed?: (input: I) => string[]
   /** the text the guard reads, for JSON outputs */
   text?: (o: O) => string
+  /** task-specific checks (e.g. evidence dates that are not in the context), reported as unverified */
+  extraFlags?: (o: O, ctx: unknown) => string[]
 }
 
 export interface Result<O> {
@@ -184,6 +186,7 @@ function params(spec: AnySpec, ctx: unknown, instruction: string, locale: Locale
 function checked<O>(spec: TaskSpec<unknown, O>, output: O, ctx: unknown, input: unknown): { flags: Meta["flags"]; ok: boolean } {
   const text = typeof output === "string" ? output : spec.text ? spec.text(output) : JSON.stringify(output)
   const g = guard(text, ctx, spec.typed ? spec.typed(input as never) : [])
+  if (spec.extraFlags) g.unverified_numbers = [...new Set([...g.unverified_numbers, ...spec.extraFlags(output, ctx)])]
   const bad = g.unverified_numbers.length > 0 || g.banned_phrases.length > 0
   const rejected = spec.guard === "reject" && bad
   return { flags: { ...g, rejected }, ok: !rejected }
@@ -252,7 +255,7 @@ export async function* run<I, O>(specIn: TaskSpec<I, O>, input: I, opts: Opts): 
     const hit = await readCache<O>(spec.task, key)
     if (hit) {
       const m = { ...hit.meta, source: "cache" as const, cost_usd: 0 }
-      await ledger(spec, m, opts)
+      if (!opts.cacheOnly) await ledger(spec, m, opts) // a peek at the cache is not a call
       yield done(hit.output, m)
       return
     }

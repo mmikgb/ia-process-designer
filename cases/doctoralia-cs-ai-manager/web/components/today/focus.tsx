@@ -3,6 +3,7 @@
 // Modo ráfaga: one doctor at a time, in the day's order, with the outcome a key away.
 import { useCallback, useEffect, useRef, useState } from "react"
 import { ArrowRight, CheckCircle2 } from "lucide-react"
+import { AnalysisSummary } from "@/components/ai/analysis"
 import { ActionPanel } from "@/components/doctor/action-panel"
 import { AgreedDialog } from "@/components/today/agreed-dialog"
 import { NA_REASONS, copiedDrafts, useLogOutcome } from "@/components/today/outcome-menu"
@@ -203,9 +204,7 @@ export function FocusMode({ day, open, onOpenChange }: { day: Day; open: boolean
                         </ul>
                       )}
                     </div>
-                    <div className="rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
-                      <span className="font-medium text-foreground">{t("focus.analysis")}.</span> {t("focus.analysis.soon")}
-                    </div>
+                    <AnalysisSummary doctorId={y.doctor_id} />
                   </>
                 ) : null}
               </section>

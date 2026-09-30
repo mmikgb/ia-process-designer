@@ -124,3 +124,29 @@ export function modelName(id: string): string {
   const m = /claude-(\w+)/.exec(id)?.[1] ?? id
   return m.charAt(0).toUpperCase() + m.slice(1)
 }
+
+/** A JSON AI route (the doctor analysis): run(body) posts it; loading until it answers. */
+export function useAiJson<O>(route: string) {
+  const [a, setA] = useState<AiAnswer<O>>(EMPTY)
+  const seq = useRef(0)
+  const run = useCallback(
+    async (body: unknown) => {
+      const n = ++seq.current
+      setA((x) => ({ ...x, loading: true, error: false }))
+      try {
+        const r = await fetch(route, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
+        if (!r.ok) throw new Error(String(r.status))
+        const d = (await r.json()) as { output: O; meta: AiMeta; context: unknown }
+        if (n === seq.current) setA({ text: "", output: d.output, meta: d.meta, context: d.context, loading: false, error: false })
+      } catch {
+        if (n === seq.current) setA((x) => ({ ...x, loading: false, error: true }))
+      }
+    },
+    [route],
+  )
+  const reset = useCallback(() => {
+    seq.current++
+    setA(EMPTY)
+  }, [])
+  return { ...a, run, reset }
+}
