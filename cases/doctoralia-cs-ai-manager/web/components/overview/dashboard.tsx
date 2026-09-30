@@ -64,11 +64,6 @@ export function Dashboard({ data }: { data: OverviewData }) {
   const kpi = scope.periods[filters.period] ?? scope.periods[String(data.kpi.window_days)]
   const label = useMemo(() => scopeLabel(data, filters.scope), [data, filters.scope])
 
-  const openSignal = (signal: string) => {
-    onChange({ signal, tier: "all" })
-    document.getElementById("worklist")?.scrollIntoView({ behavior: "smooth", block: "start" })
-  }
-
   return (
     <>
       <FilterBar data={data} filters={filters} onChange={onChange} />
@@ -83,8 +78,8 @@ export function Dashboard({ data }: { data: OverviewData }) {
       <KpiGrid kpis={kpi.kpis} scope={filters.scope} period={filters.period} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <AttentionList attention={kpi.attention} onOpenSignal={openSignal} />
-        <RiskSegments segments={kpi.segments} />
+        <AttentionList attention={kpi.attention} scope={filters.scope} />
+        <RiskSegments segments={kpi.segments} scope={filters.scope} />
       </div>
 
       <OnboardingsChart

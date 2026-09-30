@@ -40,6 +40,7 @@ export interface AttentionItem {
 }
 
 export interface SegmentItem {
+  key?: string // healthy | watch | at_risk | critical (meta.risk_bands)
   band: string
   n: number
   share: number

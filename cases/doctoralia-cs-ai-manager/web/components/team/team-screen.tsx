@@ -1,14 +1,12 @@
 "use client"
 
-import { ExplainButton } from "@/components/ai/explain"
-
+import Link from "next/link"
 import { useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { ExplainButton } from "@/components/ai/explain"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { formatPercent } from "@/lib/format"
-import { defaultFilters, loadFilters, saveFilters, type Filters } from "@/lib/controls"
-import { useIdentity } from "@/lib/identity"
+import { TEAM_FLAG, listHref } from "@/lib/lists"
 import type { OverviewData, TeamRow } from "@/lib/types"
 
 const pct = (v: number | null) => (v == null ? "—" : formatPercent(v, 0))
@@ -42,8 +40,6 @@ function PickupStrip({ values, max, target }: { values: (number | null)[]; max: 
 }
 
 export function TeamScreen({ data }: { data: OverviewData }) {
-  const router = useRouter()
-  const { setScope } = useIdentity()
   const { team } = data
   const [which, setWhich] = useState<string>("all")
   const rows = useMemo(() => team.rows.filter((r) => which === "all" || r.team === which), [team.rows, which])
@@ -60,23 +56,20 @@ export function TeamScreen({ data }: { data: OverviewData }) {
   const maxShare = Math.max(...team.rows.map((r) => r.at_risk_share ?? 0), 0.01)
   const maxBucket = Math.max(...team.buckets.map((b) => b.converted), 0.01)
 
-  // Every count is a link: land on the overview with that specialist's book and the matching list.
-  const open = (r: TeamRow, patch: Partial<Filters>) => {
-    const base = loadFilters(data) ?? defaultFilters(data)
-    saveFilters({ ...base, role: "manager", scope: r.id, showHandled: false, ...patch })
-    setScope(r.id)
-    router.push("/resumen#worklist")
+  // Every count is a link to exactly the doctors it counts (T5.2).
+  const Count = ({ r, k, label }: { r: TeamRow; k: keyof typeof TEAM_FLAG & keyof TeamRow; label: string }) => {
+    const v = r[k] as number
+    return (
+      <Link
+        href={listHref(r.id, { flag: TEAM_FLAG[k] })}
+        data-count={`${r.id}:${k}`}
+        aria-label={`${label}: ${v}, ${r.name}`}
+        className="rounded px-1 font-medium tabular-nums text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {v.toLocaleString("en-US")}
+      </Link>
+    )
   }
-  const Count = ({ r, v, patch, label }: { r: TeamRow; v: number; patch: Partial<Filters>; label: string }) => (
-    <button
-      type="button"
-      onClick={() => open(r, patch)}
-      aria-label={`${label}: ${v}, open ${r.name}'s list`}
-      className="rounded px-1 font-medium tabular-nums text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      {v.toLocaleString("en-US")}
-    </button>
-  )
 
   const fast = team.buckets[0]
   const slow = team.buckets[team.buckets.length - 1]
@@ -117,7 +110,7 @@ export function TeamScreen({ data }: { data: OverviewData }) {
         <CardHeader className="flex flex-col gap-1">
           <CardTitle>Work in each book</CardTitle>
           <p className="text-sm text-muted-foreground text-pretty">
-            Active doctors only. Every count opens those doctors on the overview, with the owner already selected.
+            Active doctors only. Every count opens exactly those doctors.
           </p>
         </CardHeader>
         <CardContent className="overflow-x-auto">
@@ -147,7 +140,7 @@ export function TeamScreen({ data }: { data: OverviewData }) {
                   <td className="py-2 pr-3">
                     {/* workload balance: share of the book at risk, same scale for everyone */}
                     <div className="flex items-center gap-2">
-                      <Count r={r} v={r.at_risk} label="At risk" patch={{ tier: "all", signal: "all", sort: "risk" }} />
+                      <Count r={r} k="at_risk" label="At risk" />
                       <div className="h-1.5 w-20 rounded-full bg-muted">
                         <div className="h-full rounded-full bg-foreground/60" style={{ width: `${((r.at_risk_share ?? 0) / maxShare) * 100}%` }} />
                       </div>
@@ -155,11 +148,17 @@ export function TeamScreen({ data }: { data: OverviewData }) {
                     </div>
                   </td>
                   <td className="py-2 pr-3 text-right">
-                    <Count r={r} v={r.may_cancel} label="May cancel" patch={{ tier: "all", signal: "churn_threat", sort: "lead" }} />
+                    <Count r={r} k="may_cancel" label="May cancel" />
                   </td>
-                  <td className="py-2 pr-3 text-right tabular-nums">{r.hollow}</td>
-                  <td className="py-2 pr-3 text-right tabular-nums">{r.not_found}</td>
-                  <td className="py-2 text-right tabular-nums">{r.open_commitments}</td>
+                  <td className="py-2 pr-3 text-right">
+                    <Count r={r} k="hollow" label="Agenda too thin" />
+                  </td>
+                  <td className="py-2 pr-3 text-right">
+                    <Count r={r} k="not_found" label="Not being found" />
+                  </td>
+                  <td className="py-2 text-right">
+                    <Count r={r} k="open_commitments" label="Open commitments" />
+                  </td>
                 </tr>
               ))}
             </tbody>

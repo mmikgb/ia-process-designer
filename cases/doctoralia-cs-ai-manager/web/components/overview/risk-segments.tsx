@@ -1,6 +1,8 @@
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { formatPercent } from "@/lib/format"
+import { listHref } from "@/lib/lists"
 import type { SegmentItem } from "@/lib/types"
 
 const BAND_COLOR: Record<string, string> = {
@@ -10,7 +12,7 @@ const BAND_COLOR: Record<string, string> = {
   Critical: "bg-risk-critical",
 }
 
-export function RiskSegments({ segments }: { segments: SegmentItem[] }) {
+export function RiskSegments({ segments, scope = "all" }: { segments: SegmentItem[]; scope?: string }) {
   return (
     <Card>
       <CardHeader>
@@ -38,9 +40,17 @@ export function RiskSegments({ segments }: { segments: SegmentItem[] }) {
                 <span className="text-sm text-foreground">{seg.band}</span>
               </div>
               <div className="flex items-baseline gap-2 tabular-nums">
-                <span className="text-sm font-medium text-foreground">
-                  {seg.n.toLocaleString("en-US")}
-                </span>
+                {seg.key ? (
+                  <Link
+                    href={listHref(scope, { risk_band: seg.key })}
+                    data-count={`band:${seg.key}`}
+                    className="text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  >
+                    {seg.n.toLocaleString("en-US")}
+                  </Link>
+                ) : (
+                  <span className="text-sm font-medium text-foreground">{seg.n.toLocaleString("en-US")}</span>
+                )}
                 <span className="text-xs text-muted-foreground">
                   {formatPercent(seg.share, 1)}
                 </span>

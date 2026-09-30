@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { ArrowDown, ArrowUp } from "lucide-react"
 import { Line, LineChart, ResponsiveContainer } from "recharts"
 import { Badge } from "@/components/ui/badge"
@@ -9,6 +10,7 @@ import { formatDeltaPct, isGoodDelta, pyFormat } from "@/lib/format"
 import type { KpiItem } from "@/lib/types"
 import { useT } from "@/lib/i18n"
 import { ExplainButton } from "@/components/ai/explain"
+import { KPI_FLAG, listHref } from "@/lib/lists"
 
 export function KpiGrid({ kpis, scope = "all", period = "30" }: { kpis: KpiItem[]; scope?: string; period?: string }) {
   return (
@@ -35,9 +37,20 @@ function KpiCard({ kpi, scope, period }: { kpi: KpiItem; scope: string; period: 
       </CardHeader>
       <CardContent className="flex flex-col gap-2 pt-2">
         <div className="flex items-center justify-between gap-2">
-          <span className="font-mono text-3xl font-semibold tabular-nums text-foreground">
-            {kpi.value == null ? "\u2014" : pyFormat(kpi.value, kpi.fmt)}
-          </span>
+          {kpi.value != null && KPI_FLAG[kpi.key] ? (
+            // a count of doctors: it opens exactly those doctors (T5.2)
+            <Link
+              href={listHref(scope, { flag: KPI_FLAG[kpi.key] })}
+              data-count={`kpi:${kpi.key}`}
+              className="rounded font-mono text-3xl font-semibold tabular-nums text-foreground underline-offset-4 hover:text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              {pyFormat(kpi.value, kpi.fmt)}
+            </Link>
+          ) : (
+            <span className="font-mono text-3xl font-semibold tabular-nums text-foreground">
+              {kpi.value == null ? "\u2014" : pyFormat(kpi.value, kpi.fmt)}
+            </span>
+          )}
           {hasDelta && (
             <Badge
               variant="secondary"

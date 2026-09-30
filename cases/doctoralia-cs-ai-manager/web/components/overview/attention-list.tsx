@@ -1,18 +1,11 @@
+import Link from "next/link"
 import { ExplainButton } from "@/components/ai/explain"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatPercent } from "@/lib/format"
+import { listHref } from "@/lib/lists"
 import type { AttentionItem } from "@/lib/types"
 
-/** Attention keys that exist as a watchlist signal, so a row can open those doctors. */
-const TO_SIGNAL: Record<string, string> = { churn_threat: "churn_threat", discouraged: "discouraged" }
-
-export function AttentionList({
-  attention,
-  onOpenSignal,
-}: {
-  attention: AttentionItem[]
-  onOpenSignal?: (signal: string) => void
-}) {
+export function AttentionList({ attention, scope = "all" }: { attention: AttentionItem[]; scope?: string }) {
   const maxLift = Math.max(...attention.map((a) => a.lift), 1)
 
   return (
@@ -24,24 +17,21 @@ export function AttentionList({
         {attention.map((item) => (
           <div key={item.key} className="flex flex-col gap-1.5">
             <div className="flex items-baseline justify-between gap-2">
-              {onOpenSignal && TO_SIGNAL[item.key] ? (
-                <button
-                  type="button"
-                  onClick={() => onOpenSignal(TO_SIGNAL[item.key])}
-                  className="rounded text-left text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  {item.label} →
-                </button>
-              ) : (
-                <span className="text-sm font-medium text-foreground text-pretty">{item.label}</span>
-              )}
+              <span className="text-sm font-medium text-foreground text-pretty">{item.label}</span>
               <span className="flex shrink-0 items-center gap-1 text-sm font-semibold tabular-nums text-foreground">
                 {formatPercent(item.churn, 1)} churn
                 <ExplainButton kind="signal" itemKey={item.key} label={item.label} />
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              {item.doctors.toLocaleString("en-US")} doctors · {item.active.toLocaleString("en-US")} active
+              {item.doctors.toLocaleString("en-US")} doctors ·{" "}
+              <Link
+                href={listHref(scope, { signal: item.key })}
+                data-count={`signal:${item.key}`}
+                className="font-medium text-primary tabular-nums underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              >
+                {item.active.toLocaleString("en-US")} active →
+              </Link>
             </p>
             <div className="flex items-center gap-2">
               <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
