@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { DoctorPanel } from "@/components/doctor/doctor-panel"
 import { AttentionList } from "@/components/overview/attention-list"
 import { FilterBar } from "@/components/overview/filter-bar"
 import { HeroCard } from "@/components/overview/hero-card"
@@ -56,6 +57,13 @@ export function Dashboard({ data }: { data: OverviewData }) {
     })
   }, [])
 
+  const [openDoc, setOpenDoc] = useState<{ id: string; owner: string } | null>(null)
+  const closeDoc = useCallback(() => setOpenDoc(null), [])
+  const ownerName = useCallback(
+    (id: string) => data.specialists.find((s) => s.id === id)?.name ?? id,
+    [data.specialists],
+  )
+
   const scope = data.scopes[filters.scope] ?? data.scopes.all
   const kpi = scope.periods[filters.period] ?? scope.periods[String(data.kpi.window_days)]
   const label = useMemo(() => scopeLabel(data, filters.scope), [data, filters.scope])
@@ -95,7 +103,16 @@ export function Dashboard({ data }: { data: OverviewData }) {
         onChange={onChange}
         handled={handled}
         onHandle={onHandle}
+        onOpenDoctor={(id, owner) => setOpenDoc({ id, owner })}
         now={now}
+      />
+
+      <DoctorPanel
+        target={openDoc}
+        ownerName={ownerName}
+        handled={openDoc ? handled[openDoc.id] : undefined}
+        onHandle={(h) => openDoc && onHandle(openDoc.id, h)}
+        onClose={closeDoc}
       />
 
       <WatchlistContext predict={data.predict} />

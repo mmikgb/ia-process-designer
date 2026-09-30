@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import pipeline as P
 import notes as N
 import series, spc, forecast, insight, llm, kpi
+import draft as D
 
 OUT = ROOT / "out"
 CACHE = OUT / "bundles"
@@ -221,8 +222,55 @@ def web_view(b: dict, top: int = 12) -> dict:
     }
 
 
+DOSSIER_FIELDS = ["doctor_id", "doctor_name", "specialty", "city", "status", "signup_date",
+                  "churned_at", "owner_specialist_id", "onboarding_grade", "onboarding_score",
+                  "closed_at_cap", "sig_onboarding_no_show", "calendar_enabled",
+                  "weekly_slots_published", "bookings_avg", "bookings_per_slot",
+                  "pct_specialty_city", "median_specialty_city", "days_since_contact",
+                  "risk_score", "risk_reasons", "top_signal", "top_signal_at", "top_signal_note"]
+
+
+def _num(v):
+    if v is None or (isinstance(v, float) and np.isnan(v)):
+        return None
+    return round(v, 3) if isinstance(v, float) else v
+
+
+def dossiers(b: dict) -> dict[str, list]:
+    """One file per owner: what the doctor panel shows, with the copilot's draft.
+
+    The draft comes from draft.compose, the same call the Streamlit card makes,
+    so the web panel and the Streamlit card cannot disagree about what to send.
+    """
+    doc = pd.DataFrame(b["doctors"])
+    names = {s["specialist_id"]: s["specialist_name"] for s in b["specialists"]}
+    bk = pd.DataFrame(b["bookings"]).sort_values("month").groupby("doctor_id")
+    it = (pd.DataFrame(b["interactions"]).sort_values("occurred_at", ascending=False)
+          .groupby("doctor_id").head(6).groupby("doctor_id"))
+    bk_d = {k: g[["month", "patient_bookings", "admin_bookings"]].to_dict("records") for k, g in bk}
+    it_d = {k: g[["occurred_at", "channel", "direction", "specialist_id", "note"]]
+            .to_dict("records") for k, g in it}
+    out: dict[str, list] = {}
+    for _, r in doc.iterrows():
+        first = names.get(r.owner_specialist_id, "su especialista").split()[0]
+        res = D.compose(r, first, "el jueves")
+        d = {k: _num(r[k]) for k in DOSSIER_FIELDS}
+        d["bookings"] = bk_d.get(r.doctor_id, [])
+        d["contacts"] = it_d.get(r.doctor_id, [])
+        d["copilot"] = {k: res[k] for k in
+                        ["mode", "play", "why", "ask", "draft", "instead", "channel",
+                         "confident", "confidence", "gaps"]}
+        out.setdefault(r.owner_specialist_id, []).append(d)
+    return out
+
+
 def write_web_view(b: dict) -> Path:
     OUT.mkdir(exist_ok=True)
+    dd = OUT / "doctors"
+    dd.mkdir(exist_ok=True)
+    for owner, rows in dossiers(b).items():
+        (dd / f"{owner}.json").write_text(json.dumps(_clean(rows), ensure_ascii=False,
+                                                     separators=(",", ":")))
     p = OUT / "overview.json"
     p.write_text(json.dumps(web_view(b), ensure_ascii=False, separators=(",", ":")))
     return p

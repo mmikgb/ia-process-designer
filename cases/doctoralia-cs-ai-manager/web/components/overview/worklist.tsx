@@ -34,6 +34,7 @@ export function Worklist({
   onChange,
   handled,
   onHandle,
+  onOpenDoctor,
   now,
 }: {
   data: OverviewData
@@ -41,6 +42,7 @@ export function Worklist({
   onChange: (patch: Partial<Filters>) => void
   handled: Record<string, Handled>
   onHandle: (doctorId: string, h: Handled | null) => void
+  onOpenDoctor: (doctorId: string, owner: string) => void
   now: Date
 }) {
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -198,8 +200,8 @@ export function Worklist({
                   <Fragment key={w.doctor_id}>
                     <TableRow className={cn(off && "opacity-55")} aria-expanded={open}>
                       <TableCell>
-                        <button type="button" onClick={toggle} className="flex flex-col items-start text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
-                          <span className="font-medium text-foreground">{w.doctor_name}</span>
+                        <button type="button" onClick={() => onOpenDoctor(w.doctor_id, w.owner_specialist_id)} className="flex flex-col items-start text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
+                          <span className="font-medium text-primary underline-offset-4 hover:underline">{w.doctor_name}</span>
                           <span className="text-xs text-muted-foreground">
                             {w.specialty} · {w.city}
                           </span>

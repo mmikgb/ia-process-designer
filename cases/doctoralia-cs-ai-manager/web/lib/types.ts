@@ -182,3 +182,45 @@ export interface OverviewData {
   predict: Predict
   watchlist: Watchlist
 }
+
+/** One doctor, as the panel shows it. Written per owner by bundle.py (out/doctors/<owner>.json). */
+export interface Dossier {
+  doctor_id: string
+  doctor_name: string
+  specialty: string
+  city: string
+  status: string
+  signup_date: string | null
+  churned_at: string | null
+  owner_specialist_id: string
+  onboarding_grade: string | null
+  onboarding_score: number | null
+  closed_at_cap: boolean | null
+  sig_onboarding_no_show: boolean | null
+  calendar_enabled: boolean | null
+  weekly_slots_published: number | null
+  bookings_avg: number | null
+  bookings_per_slot: number | null
+  pct_specialty_city: number | null
+  median_specialty_city: number | null
+  days_since_contact: number | null
+  risk_score: number
+  risk_reasons: string | null
+  top_signal: string | null
+  top_signal_at: string | null
+  top_signal_note: string | null
+  bookings: { month: string; patient_bookings: number; admin_bookings: number }[]
+  contacts: { occurred_at: string; channel: string; direction: string; specialist_id: string; note: string | null }[]
+  copilot: {
+    mode: "draft" | "brief" | "handoff" | null
+    play: string | null
+    why: string | null
+    ask: string | null
+    draft: string | null
+    instead: string | null
+    channel: string | null
+    confident: boolean
+    confidence: number
+    gaps: string[]
+  }
+}
