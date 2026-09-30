@@ -15,3 +15,10 @@ node_modules
 .DS_Store
 *.tsbuildinfo
 next-env.d.ts
+
+# Written by Next 16 on `next dev` when agentRules is on; the case folder has its own
+AGENTS.md
+CLAUDE.md
+
+# The template is committed; the real key lives in .env.local
+!.env.example

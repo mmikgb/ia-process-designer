@@ -254,3 +254,21 @@ code wins and the difference is written here.
 
 Spec vs code: the spec says `analysis.py` runs after `bundle.py`; it actually needs `pipeline.py`
 first. Order to use: `pipeline.py` → `bundle.py` → `analysis.py`.
+
+### T0.2 Config hygiene
+
+- `next.config.mjs`: `ignoreBuildErrors: false`, `agentRules: false` (the option exists in Next
+  16.3.3's config schema). `pnpm dev` served `/` with 200 and wrote no `web/AGENTS.md` or
+  `web/CLAUDE.md`; both are in `web/.gitignore` anyway. `typecheck` and `build` pass with errors
+  no longer ignored: nothing surfaced.
+- `web/.env.example` added. The repo-root `.gitignore` ignores `.env.*`, which would have
+  swallowed it; `web/.gitignore` re-includes `!.env.example`.
+- Added `@anthropic-ai/sdk`, `zod`, `sonner`, `cmdk`, dev `@playwright/test`; `pytest` in
+  `requirements.txt`; `tests/conftest.py` puts `src/` on `sys.path`.
+- **Not done: the shadcn components.** `pnpm dlx shadcn@latest add …` fails because
+  `ui.shadcn.com` is blocked by this container's egress policy (403 on CONNECT); npm is
+  reachable. The components (`sidebar`, `command`, `dialog`, `sheet`, `tabs`, `dropdown-menu`,
+  `avatar`, `progress`, `textarea`, `toggle-group`, `select`, `popover`, `sonner`, `skeleton`,
+  `kbd`) will be written by hand on `@base-ui/react` in the phase that first uses them, matching
+  the existing `base-nova` files in `components/ui/`. On a Mac with open network the CLI command
+  in the spec works and can replace them.
