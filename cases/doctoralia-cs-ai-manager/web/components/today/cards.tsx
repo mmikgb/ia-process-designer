@@ -51,7 +51,7 @@ export function BriefingCard({ day, children }: { day: Day; children?: React.Rea
     <div className="relative flex min-h-44 flex-col gap-3 overflow-hidden rounded-lg bg-linear-to-br from-[#005446] via-[#006a59] to-[#00806a] p-6 text-white shadow-card lg:col-span-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-[15px] font-semibold">{t("today.briefing.title")}</h2>
-        <span className="flex items-center gap-1">
+        <span className="flex flex-wrap items-center gap-1">
           {ai.meta ? <SourceBadge meta={ai.meta} onDark /> : <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium">{t("today.briefing.auto")}</span>}
           <ContextButton context={ai.context} onDark />
           <RegenerateButton onClick={() => void run(body(true))} disabled={ai.loading} onDark />

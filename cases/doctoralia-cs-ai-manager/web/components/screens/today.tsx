@@ -82,7 +82,7 @@ export function TodayScreen() {
           <div className="flex justify-end">
             <CapacityControl day={day} />
           </div>
-          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
             <Queue day={day} playFilter={playFilter} setPlayFilter={setPlayFilter} />
             <Rail day={day} />
           </div>

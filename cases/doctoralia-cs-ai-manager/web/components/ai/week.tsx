@@ -26,7 +26,7 @@ export function WeekCard() {
     <div className="flex min-h-40 flex-col gap-3 rounded-lg bg-linear-to-br from-[#005446] via-[#006a59] to-[#00806a] p-6 text-white shadow-card">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-[15px] font-semibold">{t("summary.week")}</h2>
-        <span className="flex items-center gap-1">
+        <span className="flex flex-wrap items-center gap-1">
           <SourceBadge meta={ai.meta} onDark />
           <ContextButton context={ai.context} onDark />
           <RegenerateButton onClick={() => void run(body(true))} disabled={ai.loading} onDark />
