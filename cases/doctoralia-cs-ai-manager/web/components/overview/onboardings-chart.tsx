@@ -15,11 +15,11 @@ import type { WeeklyOnboarding } from "@/lib/types"
 const chartConfig: ChartConfig = {
   activated: {
     label: "Activated (A/B)",
-    color: "var(--color-primary)",
+    color: "var(--color-chart-1)",
   },
   struggling: {
     label: "Struggling (C/D)",
-    color: "var(--color-risk-watch)",
+    color: "var(--color-chart-2)",
   },
 }
 
@@ -93,11 +93,13 @@ export function OnboardingsChart({
             )}
             <ChartTooltip content={<OnboardingsTooltip />} cursor={{ fill: "var(--color-muted)" }} />
             <ChartLegend content={<ChartLegendContent />} />
-            <Bar dataKey="activated" stackId="onboardings" fill="var(--color-activated)" />
+            <Bar dataKey="activated" stackId="onboardings" fill="var(--color-activated)" stroke="var(--color-card)" strokeWidth={1} />
             <Bar
               dataKey="struggling"
               stackId="onboardings"
               fill="var(--color-struggling)"
+              stroke="var(--color-card)"
+              strokeWidth={1}
               radius={[4, 4, 0, 0]}
             />
           </BarChart>

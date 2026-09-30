@@ -7,10 +7,13 @@ import { HeroCard } from "@/components/overview/hero-card"
 import { KpiGrid } from "@/components/overview/kpi-grid"
 import { OnboardingsChart } from "@/components/overview/onboardings-chart"
 import { RiskSegments } from "@/components/overview/risk-segments"
+import { WatchlistContext } from "@/components/overview/watchlist-context"
 import { Worklist } from "@/components/overview/worklist"
 import {
   defaultFilters,
+  loadFilters,
   loadHandled,
+  saveFilters,
   saveHandled,
   scopeLabel,
   type Filters,
@@ -29,9 +32,19 @@ export function Dashboard({ data }: { data: OverviewData }) {
   // Fixed per page load so a snooze does not expire mid-render.
   const [now] = useState(() => new Date())
 
-  useEffect(() => setHandled(loadHandled()), [])
+  useEffect(() => {
+    setHandled(loadHandled())
+    const saved = loadFilters(data)
+    if (saved) setFilters(saved)
+  }, [data])
 
-  const onChange = useCallback((patch: Partial<Filters>) => setFilters((f) => ({ ...f, ...patch })), [])
+  const onChange = useCallback((patch: Partial<Filters>) => {
+    setFilters((f) => {
+      const next = { ...f, ...patch }
+      saveFilters(next)
+      return next
+    })
+  }, [])
 
   const onHandle = useCallback((id: string, h: Handled | null) => {
     setHandled((prev) => {
@@ -84,6 +97,8 @@ export function Dashboard({ data }: { data: OverviewData }) {
         onHandle={onHandle}
         now={now}
       />
+
+      <WatchlistContext predict={data.predict} />
     </>
   )
 }

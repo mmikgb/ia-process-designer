@@ -77,7 +77,9 @@ def c_chart(df, period, count, label) -> dict:
     }
 
 
-def xmr(df, period, value, label) -> dict:
+def xmr(df, period, value, label, floor: float | None = None) -> dict:
+    """Individuals chart. `floor` clips the lower limit for a measure that cannot go below it
+    (minutes, scores): a limit at -35 minutes is arithmetic, not a threshold anyone can cross."""
     d = df.dropna(subset=[value]).copy()
     base = d[(d[period] >= BASELINE[0]) & (d[period] <= BASELINE[1])]
     if len(base) < 8:
@@ -88,11 +90,12 @@ def xmr(df, period, value, label) -> dict:
     s = mrbar / D2 if mrbar else float(base[value].std() or 1)
     vals = d[value].to_numpy(dtype=float)
     sig = _rules(vals, np.full(len(vals), xbar), np.full(len(vals), s))
+    lcl = xbar - 3 * s if floor is None else max(xbar - 3 * s, floor)
     return {
         "chart": "xmr", "label": label, "center": round(xbar, 3), "sigma": round(s, 3),
         "baseline": {"from": BASELINE[0], "to": BASELINE[1], "frozen": True, "n_points": len(base)},
         "points": [{"period": str(p), "value": round(float(v), 3),
-                    "ucl": round(xbar + 3 * s, 3), "lcl": round(xbar - 3 * s, 3),
+                    "ucl": round(xbar + 3 * s, 3), "lcl": round(lcl, 3),
                     "signals": g} for p, v, g in zip(d[period], vals, sig)],
     }
 
@@ -143,9 +146,9 @@ def build(t: dict, ser: dict) -> dict:
         "escalations_daily": c_chart(daily_e, "date", "n",
                                      "Escalations raised per day"),
         "pickup_weekly": xmr(w_esc, "period", "median_pickup",
-                             "Median escalation pickup, minutes, weekly"),
+                             "Median escalation pickup, minutes, weekly", floor=0),
         "onboarding_score_weekly": xmr(w_onb, "period", "avg_score",
-                                       "Average onboarding score, weekly"),
+                                       "Average onboarding score, weekly", floor=0),
     }
     for c in charts.values():
         c["stability"] = stability(c)

@@ -55,6 +55,31 @@ export function scopeLabel(data: OverviewData, scope: string): string {
   return data.specialists.find((s) => s.id === scope)?.name ?? scope
 }
 
+// Filters survive moving between screens in this tab ("cross-screen filters persist").
+const FILTERS = "cs-control-room:filters:v1"
+
+export function loadFilters(data: OverviewData): Filters | null {
+  try {
+    const raw = window.sessionStorage.getItem(FILTERS)
+    if (!raw) return null
+    const f = { ...defaultFilters(data), ...(JSON.parse(raw) as Partial<Filters>) }
+    // A rebuild can drop a specialist or a period; fall back rather than show nothing.
+    if (!data.scopes[f.scope]) f.scope = "all"
+    if (!data.periods.map(String).includes(f.period)) f.period = String(data.kpi.window_days)
+    return f
+  } catch {
+    return null
+  }
+}
+
+export function saveFilters(f: Filters) {
+  try {
+    window.sessionStorage.setItem(FILTERS, JSON.stringify(f))
+  } catch {
+    // storage blocked: filters still work, they just reset on navigation
+  }
+}
+
 // ---- done / snooze -------------------------------------------------------
 // Kept in this browser only. The plan puts this in out/state.db behind the
 // Streamlit app; a static web build has no server, so it lives here for now.

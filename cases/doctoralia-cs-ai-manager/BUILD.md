@@ -25,6 +25,10 @@ python3 src/bundle.py          # also writes out/overview.json
 cd web && pnpm install && pnpm dev    # http://localhost:3000
 ```
 
+Two screens: **Overview** (KPIs, attention, onboardings, the watchlist with its
+lead times, the 38% ceiling and the day-14 checkpoint) and **Control** (four
+control charts with a frozen baseline and labelled signal rules).
+
 Controls: view as Manager / Specialist, portfolio (whole book, team, specialist),
 compare last 30 / 60 / 90 days, watchlist tier, signal, sort by lead time or risk,
 Done / Snooze 7d (kept in this browser), and the attention rows open the matching

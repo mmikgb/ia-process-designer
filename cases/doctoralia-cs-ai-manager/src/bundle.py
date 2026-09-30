@@ -109,10 +109,13 @@ def build(xlsx: Path | None = None, use_llm: bool = True, cache: bool = True) ->
 
     h = file_hash(xlsx)
     CACHE.mkdir(parents=True, exist_ok=True)
-    # The key covers the rules and the schema too: editing a threshold in
-    # pipeline.py must rebuild, not hand back the bundle from before the edit.
-    rules_h = hashlib.sha256(json.dumps(P.RULES, sort_keys=True).encode()).hexdigest()[:8]
-    cached = CACHE / f"{h}-{rules_h}-v{SCHEMA_VERSION}.json"
+    # The key covers the code and the rules too: editing a threshold in
+    # pipeline.py or a play in draft.py must rebuild, not hand back the bundle
+    # from before the edit.
+    code = hashlib.sha256(json.dumps(P.RULES, sort_keys=True).encode())
+    for src in sorted(Path(__file__).parent.glob("*.py")):
+        code.update(src.read_bytes())
+    cached = CACHE / f"{h}-{code.hexdigest()[:8]}-v{SCHEMA_VERSION}.json"
     if cache and cached.exists():
         b = json.loads(cached.read_text())
         b["meta"]["from_cache"] = True
@@ -204,6 +207,14 @@ def web_view(b: dict, top: int = 12) -> dict:
         "specialists": sorted(people, key=lambda p: p["id"]),
         "teams": sorted({p["team"] for p in people}),
         "scopes": b["scopes"],
+        # Control charts are portfolio-wide by design: a 400-doctor book has too
+        # few points a day to hold limits.
+        "spc": b["spc"],
+        "predict": {
+            "ceiling": b["predict"]["ceiling"],
+            "lead_times": b["predict"]["lead_times"],
+            "day14": {k: v for k, v in b["predict"]["day14"].items() if k != "worklist"},
+        },
         "watchlist": {"tiers": tiers,
                       "act_now_top": [{k: w[k] for k in keep} for w in act],
                       "items": [{k: w[k] for k in WATCH_FIELDS} for w in wl]},

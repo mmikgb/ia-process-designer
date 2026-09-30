@@ -1,3 +1,4 @@
+import { SiteNav } from "@/components/site-nav"
 import { ThemeToggle } from "@/components/theme-toggle"
 import type { Meta } from "@/lib/types"
 
@@ -15,7 +16,10 @@ export function SiteHeader({ meta, asof }: { meta: Meta; asof: string }) {
           source {meta.source_file} · sha {meta.source_sha256_16}
         </p>
       </div>
-      <ThemeToggle />
+      <div className="flex items-center gap-3">
+        <SiteNav />
+        <ThemeToggle />
+      </div>
     </header>
   )
 }

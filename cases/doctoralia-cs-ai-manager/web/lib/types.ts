@@ -114,6 +114,61 @@ export interface Rules {
   extract_date: string
 }
 
+export interface SpcPoint {
+  period: string
+  value: number
+  n?: number
+  ucl: number
+  lcl: number
+  signals: string[]
+}
+
+export interface SpcChart {
+  chart: "p" | "c" | "xmr"
+  label: string
+  center: number
+  sigma?: number
+  baseline: { from: string; to: string; frozen: boolean; n_points: number }
+  points: SpcPoint[]
+  stability: { stable: boolean; baseline_out_of_control: number; note: string }
+}
+
+export interface LeadTime {
+  signal: string
+  n: number
+  before_churn: number
+  median_days: number
+  p25: number
+  p75: number
+}
+
+export interface Day14Evidence {
+  calendar_on_by_day_14: boolean
+  n: number
+  avg_score: number
+  grade_a: number
+  grade_d: number
+  churn: number
+}
+
+export interface Predict {
+  ceiling: { churned_total: number; with_warning: number; share: number; note: string }
+  lead_times: LeadTime[]
+  day14: {
+    evidence: Day14Evidence[]
+    checkpoint_day: number
+    worklist_size: number
+    live_cohort: boolean
+    note: string
+    retrospective: {
+      failed_checkpoint: number
+      of_those_grade_d: number
+      grade_d_rate: number
+      passed_grade_d_rate: number
+    }
+  }
+}
+
 export interface OverviewData {
   meta: Meta
   rules: Rules
@@ -123,5 +178,7 @@ export interface OverviewData {
   specialists: Specialist[]
   teams: string[]
   scopes: Record<string, Scope>
+  spc: Record<string, SpcChart>
+  predict: Predict
   watchlist: Watchlist
 }

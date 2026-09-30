@@ -79,7 +79,9 @@
   --border: #e2dcd6;
   --input: #e2dcd6;
   --ring: #006a59;
-  --chart-1: #006a59;
+  /* chart steps: validated with the dataviz palette checks on #f5f2ef (brand #006a59
+     reads gray as a mark, chroma 0.087; #00806a is the nearest passing step) */
+  --chart-1: #00806a;
   --chart-2: #b7791f;
   --chart-3: #6b635c;
   --chart-4: #c2410c;
@@ -124,8 +126,9 @@
   --border: #3a3531;
   --input: #3a3531;
   --ring: #3cc4a8;
-  --chart-1: #3cc4a8;
-  --chart-2: #e0a53c;
+  /* validated on #1f1c1a: kept inside the dark lightness band */
+  --chart-1: #31a88e;
+  --chart-2: #c1862b;
   --chart-3: #b3aba3;
   --chart-4: #fb923c;
   --chart-5: #f97066;
