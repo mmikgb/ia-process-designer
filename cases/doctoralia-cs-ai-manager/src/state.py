@@ -4,7 +4,7 @@ is the whole point — rebuild wipes out/, so this lives in its own file and is
 keyed by doctor, never by row position.
 """
 from __future__ import annotations
-import sqlite3, time
+import json, sqlite3, time
 from pathlib import Path
 
 DB = Path(__file__).resolve().parent.parent / "out" / "state.db"
@@ -60,3 +60,24 @@ def counts() -> dict:
     r = dict(c.execute("SELECT action, COUNT(*) FROM work GROUP BY action").fetchall())
     c.close()
     return r
+
+
+# --- the web app's outcome log (out/work_log.jsonl, written by web /api/work) ---
+WORK_LOG = DB.parent / "work_log.jsonl"
+
+
+def read_work_log(owner: str | None = None) -> list[dict]:
+    """Every outcome logged in the web app, oldest first, undo events applied: an
+    event reverted by an undo is dropped, and so is the undo itself. Streamlit and
+    report.py read the same outcomes the web app wrote."""
+    if not WORK_LOG.exists():
+        return []
+    events = []
+    for line in WORK_LOG.read_text(encoding="utf-8").splitlines():
+        try:
+            events.append(json.loads(line))
+        except ValueError:
+            continue                        # a torn line never takes the log down
+    gone = {e.get("undo_of") for e in events if e.get("outcome") == "undo"}
+    return [e for e in events if e.get("outcome") != "undo" and e.get("id") not in gone
+            and (owner is None or e.get("owner") == owner)]

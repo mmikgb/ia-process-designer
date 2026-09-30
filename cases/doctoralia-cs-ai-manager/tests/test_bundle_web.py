@@ -57,3 +57,16 @@ def test_flags_agree_between_search_and_dossiers(files):
     search, dossiers = files[1], files[2]
     f = {x["doctor_id"]: x["flags"] for x in dossiers}
     assert all(f[r["i"]] == r["f"] for r in search)
+
+
+def test_read_work_log_applies_undo(tmp_path, monkeypatch):
+    import state
+    log = tmp_path / "work_log.jsonl"
+    rows = [{"id": "w1", "owner": "S01", "doctor_id": "D1", "outcome": "sent"},
+            {"id": "w2", "owner": "S01", "doctor_id": "D2", "outcome": "no_answer"},
+            {"id": "w3", "owner": "S02", "doctor_id": "D3", "outcome": "agreed"},
+            {"id": "w4", "owner": "S01", "doctor_id": "D2", "outcome": "undo", "undo_of": "w2"}]
+    log.write_text("\n".join(json.dumps(r) for r in rows) + "\n{torn")
+    monkeypatch.setattr(state, "WORK_LOG", log)
+    assert [e["id"] for e in state.read_work_log()] == ["w1", "w3"]
+    assert [e["id"] for e in state.read_work_log("S01")] == ["w1"]

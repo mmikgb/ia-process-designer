@@ -253,7 +253,8 @@ DOSSIER_FIELDS = ["doctor_id", "doctor_name", "specialty", "city", "status", "si
                   "closed_at_cap", "sig_onboarding_no_show", "calendar_enabled",
                   "weekly_slots_published", "bookings_avg", "bookings_per_slot",
                   "pct_specialty_city", "median_specialty_city", "days_since_contact",
-                  "risk_score", "top_signal", "top_signal_at", "top_signal_note"]
+                  "risk_score", "top_signal", "top_signal_at", "top_signal_note",
+                  "onboarding_closed_at", "calendar_enabled_at"]
 # Web size budget (SPEC T1.7: web/public data < 20 MB). Nothing below loses information:
 # the English copilot texts live inside copilot.i18n, risk reasons inside
 # risk_reasons_i18n, and contacts_all is written only when it adds to contacts.
