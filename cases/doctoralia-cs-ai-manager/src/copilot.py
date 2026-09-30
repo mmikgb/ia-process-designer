@@ -74,7 +74,7 @@ q = mine.sort_values(["work_next", "bookings_avg"], ascending=[False, False]).he
 
 
 def card(r, key):
-    res = D.compose(r, first, "el jueves")
+    res = D.compose(r, first)
     with st.container(border=True):
         a, b = st.columns([3, 1])
         with a:

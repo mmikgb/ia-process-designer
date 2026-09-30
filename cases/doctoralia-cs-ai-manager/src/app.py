@@ -92,7 +92,7 @@ def goto(doctor_id, scr="Doctor"):
 
 
 def card(r, key, specialist_name="su especialista"):
-    res = D.compose(r, specialist_name.split()[0], "el jueves")
+    res = D.compose(r, specialist_name.split()[0])
     done = S.is_done(r.doctor_id)
     with st.container(border=True):
         a, c2 = st.columns([4, 1])

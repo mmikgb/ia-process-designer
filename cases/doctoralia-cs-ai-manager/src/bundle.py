@@ -270,7 +270,7 @@ def dossiers(b: dict) -> dict[str, list]:
     out: dict[str, list] = {}
     for _, r in doc.iterrows():
         first = names.get(r.owner_specialist_id, "su especialista").split()[0]
-        res = D.compose(r, first, "el jueves")
+        res = D.compose(r, first)
         d = {k: _num(r[k]) for k in DOSSIER_FIELDS}
         d["bookings"] = bk_d.get(r.doctor_id, [])
         d["contacts"] = it_d.get(r.doctor_id, [])

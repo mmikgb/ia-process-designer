@@ -300,3 +300,32 @@ first. Order to use: `pipeline.py` → `bundle.py` → `analysis.py`.
   `BUILD.md` updated. The README "$0.10 per specialist" line is T4.8's.
 - Check: `python3 -c "import sys; sys.path.insert(0,'src'); import llm; print(llm.PRICES)"` prints
   the six rows.
+
+### T1.1–T1.3 Bilingual copilot, discouraged play, thresholds, the day
+
+- `src/i18n.py`: `L(en, es)`, plus `en()` and `pct()`.
+- `pipeline.risk()` returns `(score, [{key, text: L}])`; `risk_reasons` (English, joined) is
+  byte-identical to before for all 5,571 doctors; `risk_reasons_i18n` is new. Churn rates in
+  the reasons come from `LIFT`.
+- `draft.py`:
+  - New `discouraged` brief play right after `churn_threat`. "Visible progress" comes from
+    bookings rising, then calendar and slots: **the workbook has no reviews**, so the spec's
+    "reviews" option does not exist.
+  - `hollow_calendar` fires below `RULES["calendar_healthy_slots"]` (was a hard-coded 8). The
+    "cerca de N citas más" sentence is computed at build time from every calendar-on doctor
+    below vs at/above the rule (`slots_low_avg` 11.3 vs `slots_ok_avg` 15.2 at 6 → "cerca de 4",
+    which matches FINDINGS §9). If the gap rounds below 1 the sentence is dropped.
+  - `gone_quiet` reads `RULES["stale_contact_days"]` (was a literal 21).
+  - `"el jueves"` removed from `bundle.py`, `copilot.py`, `app.py`; `compose()` defaults to
+    `next_business_day(extract_date)` = "el lunes 28 de septiembre".
+  - Every play has `why_es`, `ask_es`, `brief_es`; confidence gaps, `channel_note()` and
+    `handover()` are bilingual; `compose()` adds `i18n`. Specialist-facing Spanish uses *tú*;
+    messages to doctors stay *usted*.
+  - Play mix across all 5,571 doctors, before → after: `discouraged` 0 → 100,
+    `hollow_calendar` 665 → 413 (threshold 8 → 6), `upsell_lead` 966 → 1,042 and no play
+    1,139 → 1,242 (doctors that used to fall into the 6–7-slot hollow case), `calendar_off`
+    864 → 837, `complaint_no_patients` 289 → 267.
+  - The brief quotes `top_signal_note`, the most urgent note by priority. For a discouraged
+    doctor that can be a complaint note of the same priority rather than the "desanimado" note.
+    Left as is.
+- `tests/test_draft.py`: 12 tests, including every check the spec lists.

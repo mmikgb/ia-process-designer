@@ -150,6 +150,13 @@ def doctor_features(t) -> pd.DataFrame:
 
     # The finding that matters: calendar on, nothing published.
     d["calendar_hollow"] = d.calendar_enabled & d.weekly_slots_published.lt(RULES["calendar_healthy_slots"])
+    # What publishing up to the threshold is worth, for the threshold in force (FINDINGS.md
+    # section 9 has the full table). Every doctor with the calendar on, as in that table.
+    # Constant columns so the draft templates can quote them without a second source.
+    on = d[d.calendar_enabled]
+    below = on.weekly_slots_published.lt(RULES["calendar_healthy_slots"])
+    d["slots_low_avg"] = on[below].bookings_avg.mean()
+    d["slots_ok_avg"] = on[~below].bookings_avg.mean()
 
     d = booking_dynamics(d, bk)
     d = campaign_fatigue(d, enr, extract)
