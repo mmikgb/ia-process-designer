@@ -186,7 +186,7 @@ function UserCard({ compact }: { compact: boolean }) {
   const { who, setPickerOpen } = useIdentity()
   const name = whoName(who, shell, t("who.director"))
   const role = !who
-    ? t("user.none")
+    ? ""
     : who.kind === "specialist"
       ? t("who.specialist", { team: shell.specialists.find((s) => s.id === who.id)?.team.replace("Farming ", "") ?? "" })
       : who.kind === "manager"
