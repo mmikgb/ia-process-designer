@@ -12,6 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
+import { ExplainButton } from "@/components/ai/explain"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { SpcChart, SpcPoint } from "@/lib/types"
 
@@ -69,7 +70,7 @@ function SpcTooltip({
   )
 }
 
-export function ControlChart({ chart, fmt, reading }: { chart: SpcChart; fmt: Fmt; reading: string }) {
+export function ControlChart({ chart, fmt, reading, chartKey }: { chart: SpcChart; fmt: Fmt; reading: string; chartKey?: string }) {
   const flagged = chart.points.filter((p) => p.signals.length)
   const first = chart.points[0]?.period
   const baseEnd = [...chart.points].reverse().find((p) => p.period.slice(0, 10) <= chart.baseline.to)?.period
@@ -79,7 +80,10 @@ export function ControlChart({ chart, fmt, reading }: { chart: SpcChart; fmt: Fm
       <CardHeader className="flex flex-col gap-2">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <CardTitle>{chart.label}</CardTitle>
-          <span className="text-xs text-muted-foreground">{KIND[chart.chart]}</span>
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            {KIND[chart.chart]}
+            {chartKey && <ExplainButton kind="spc" itemKey={chartKey} label={chart.label} />}
+          </span>
         </div>
         <p className="text-sm text-muted-foreground text-pretty">{reading}</p>
         {chart.stability.stable ? (

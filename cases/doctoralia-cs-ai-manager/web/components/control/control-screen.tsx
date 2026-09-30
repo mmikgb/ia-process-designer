@@ -71,7 +71,7 @@ export function ControlScreen({ data }: { data: OverviewData }) {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {charts.filter((c) => data.spc[c.key]).map((c) => (
-          <ControlChart key={c.key} chart={data.spc[c.key]} fmt={c.fmt} reading={c.reading} />
+          <ControlChart key={c.key} chartKey={c.key} chart={data.spc[c.key]} fmt={c.fmt} reading={c.reading} />
         ))}
       </div>
     </>

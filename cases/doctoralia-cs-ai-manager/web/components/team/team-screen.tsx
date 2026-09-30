@@ -1,5 +1,7 @@
 "use client"
 
+import { ExplainButton } from "@/components/ai/explain"
+
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -135,7 +137,10 @@ export function TeamScreen({ data }: { data: OverviewData }) {
               {rows.map((r) => (
                 <tr key={r.id} className="border-b border-border last:border-0">
                   <td className="py-2 pr-3">
-                    <span className="font-medium text-foreground">{r.name}</span>
+                    <span className="inline-flex items-center gap-1 font-medium text-foreground">
+                      {r.name}
+                      <ExplainButton kind="team_row" itemKey={r.id} label={r.name} />
+                    </span>
                     <span className="block text-xs text-muted-foreground">{r.team.replace("Farming ", "")}</span>
                   </td>
                   <td className="py-2 pr-3 text-right tabular-nums">{r.portfolio}</td>

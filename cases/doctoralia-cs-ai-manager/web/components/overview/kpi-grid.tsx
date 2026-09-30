@@ -8,18 +8,19 @@ import { cn } from "@/lib/utils"
 import { formatDeltaPct, isGoodDelta, pyFormat } from "@/lib/format"
 import type { KpiItem } from "@/lib/types"
 import { useT } from "@/lib/i18n"
+import { ExplainButton } from "@/components/ai/explain"
 
-export function KpiGrid({ kpis }: { kpis: KpiItem[] }) {
+export function KpiGrid({ kpis, scope = "all", period = "30" }: { kpis: KpiItem[]; scope?: string; period?: string }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {kpis.map((kpi) => (
-        <KpiCard key={kpi.key} kpi={kpi} />
+        <KpiCard key={kpi.key} kpi={kpi} scope={scope} period={period} />
       ))}
     </div>
   )
 }
 
-function KpiCard({ kpi }: { kpi: KpiItem }) {
+function KpiCard({ kpi, scope, period }: { kpi: KpiItem; scope: string; period: string }) {
   const { tx } = useT()
   const hasDelta = kpi.delta_pct !== null
   const isIncrease = hasDelta && kpi.delta_pct! > 0
@@ -28,8 +29,9 @@ function KpiCard({ kpi }: { kpi: KpiItem }) {
 
   return (
     <Card className="rounded-xl border-border">
-      <CardHeader className="gap-1 pb-0">
+      <CardHeader className="flex items-start justify-between gap-1 pb-0">
         <span className="text-xs font-medium text-muted-foreground">{tx(kpi.label)}</span>
+        <ExplainButton kind="kpi" itemKey={kpi.key} scope={scope} period={period} label={tx(kpi.label)} className="-mt-1.5 -mr-2" />
       </CardHeader>
       <CardContent className="flex flex-col gap-2 pt-2">
         <div className="flex items-center justify-between gap-2">

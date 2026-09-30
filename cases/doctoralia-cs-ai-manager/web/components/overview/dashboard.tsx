@@ -80,7 +80,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
 
       <HeroCard healthScore={kpi.health_score} healthNote={kpi.health_note} totals={kpi.totals} />
 
-      <KpiGrid kpis={kpi.kpis} />
+      <KpiGrid kpis={kpi.kpis} scope={filters.scope} period={filters.period} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AttentionList attention={kpi.attention} onOpenSignal={openSignal} />

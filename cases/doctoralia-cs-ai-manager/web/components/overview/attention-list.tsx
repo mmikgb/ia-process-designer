@@ -1,3 +1,4 @@
+import { ExplainButton } from "@/components/ai/explain"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatPercent } from "@/lib/format"
 import type { AttentionItem } from "@/lib/types"
@@ -34,8 +35,9 @@ export function AttentionList({
               ) : (
                 <span className="text-sm font-medium text-foreground text-pretty">{item.label}</span>
               )}
-              <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+              <span className="flex shrink-0 items-center gap-1 text-sm font-semibold tabular-nums text-foreground">
                 {formatPercent(item.churn, 1)} churn
+                <ExplainButton kind="signal" itemKey={item.key} label={item.label} />
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
