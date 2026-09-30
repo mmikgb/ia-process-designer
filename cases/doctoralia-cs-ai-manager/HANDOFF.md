@@ -390,3 +390,32 @@ first. Order to use: `pipeline.py` → `bundle.py` → `analysis.py`.
   withheld; Streamlit's `viz.kpi_card` reads the English side.
 - `tests/test_kpi.py`: 4 tests (no rate below n=10 in any scope or period; the Overview note
   and the team screen agree on conversion; bilingual labels quote `RULES`).
+
+### T1.7 Bundle: queue, search and dossier files
+
+- `bundle.py` writes `out/queue/<owner>.json` (from `dayplan.build`), `out/search.json` and the
+  richer dossiers, and copies all three into `web/public/`; `web/scripts/sync-data.mjs` does
+  the same. The copilot output and flags are computed once (`web_doctors()`) and shared by the
+  dossiers, the queues and search, so they cannot disagree. `meta` gains `asof`,
+  `queue_capacity`, `followup_quota` and `plays` (ordered, with bilingual labels, which were
+  added to `PLAYS`). The build prints the per-specialist queue sizes.
+- Contract differences (all in `web/lib/types.ts`):
+  - `search.json` uses short keys (`SearchRowRaw` + `searchRow()`): 1,173 KB with full keys,
+    973 KB short.
+  - Dossiers: `contacts_all` is written only when a doctor has more than 6 contacts (absent =
+    `contacts` is complete); the English copilot texts live only in `copilot.i18n` (no
+    duplicate `why`/`ask`/`instead`/`channel`/`gaps` keys); `risk_reasons` (English string)
+    is dropped in favour of `risk_reasons_i18n`. Streamlit is unaffected (it reads the bundle).
+  - Campaign `name` is the campaigns sheet's `ask` column: the sheet has no name column.
+  - The existing doctor panel now reads `risk_reasons_i18n` and `copilot.i18n` via `tx()`.
+- Checks: queue sizes printed; `pnpm build` passes; the Playwright smoke test (overview KPI
+  card, doctor panel, all five screens) shows no errors other than the known Vercel
+  Analytics 404. **Not met: web/public data is 24.1 MB against the < 20 MB check**
+  (dossiers 21 MB, queues 1.9 MB, search 1.0 MB; it was 13 MB before). Every cut left that
+  loses no information is already made. What remains is what the spec adds (full contact
+  history, campaigns, escalations, bilingual briefs). Options for Miguel: (a) serve each play's
+  `why`/`ask` once in `meta.plays` instead of in every dossier (−1.7 MB; they are the same for
+  every doctor on a play), (b) move the history (`contacts_all`, campaigns, escalations) to
+  per-owner history files loaded on the Historial tab (same total, faster panel), (c) raise
+  the cap.
+- `tests/test_bundle_web.py`: 4 tests on the files against §5.

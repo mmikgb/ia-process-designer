@@ -9,6 +9,7 @@ import { formatPercent } from "@/lib/format"
 import { loadDossier } from "@/lib/dossiers"
 import type { Handled } from "@/lib/controls"
 import type { Dossier } from "@/lib/types"
+import { tx } from "@/lib/tx"
 
 const MODE: Record<string, { label: string; icon: typeof Copy }> = {
   draft: { label: "Draft message", icon: Copy },
@@ -145,7 +146,7 @@ export function DoctorPanel({
               </div>
               <p className="text-sm text-foreground text-pretty">
                 <span className="font-medium">Why now: </span>
-                {doc.risk_reasons || "no active signal"}
+                {doc.risk_reasons_i18n.map((r) => tx(r.text)).join(" · ") || "no active signal"}
               </p>
               {doc.top_signal_note && (
                 <blockquote className="border-l-2 border-border pl-3 text-sm italic text-foreground text-pretty">
@@ -166,10 +167,10 @@ export function DoctorPanel({
                   {doc.copilot.play && ` · play ${doc.copilot.play}`}
                 </span>
               </div>
-              {doc.copilot.channel && <p className="text-xs text-warning">⚑ {doc.copilot.channel}</p>}
+              {doc.copilot.i18n.channel && <p className="text-xs text-warning">⚑ {tx(doc.copilot.i18n.channel)}</p>}
               {doc.copilot.confident && doc.copilot.draft ? (
                 <>
-                  {doc.copilot.why && <p className="text-xs text-muted-foreground text-pretty">{doc.copilot.why}</p>}
+                  {doc.copilot.i18n.why && <p className="text-xs text-muted-foreground text-pretty">{tx(doc.copilot.i18n.why)}</p>}
                   <textarea
                     value={text}
                     onChange={(e) => {
@@ -193,7 +194,7 @@ export function DoctorPanel({
                   </div>
                 </>
               ) : (
-                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-foreground">{doc.copilot.instead}</pre>
+                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-foreground">{tx(doc.copilot.i18n.instead)}</pre>
               )}
             </section>
 

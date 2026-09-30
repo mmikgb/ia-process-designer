@@ -60,6 +60,7 @@ def _c(key: str, digits: int = 0) -> str:
 PLAYS = [
     dict(
         key="churn_threat", mode="brief",
+        label=L("May cancel", "Puede cancelar"),
         when=lambda r: bool(r.sig_churn_threat),
         why=f"The doctor has said out loud they may cancel or are comparing platforms. "
             f"{_c('churn_threat')} of these churn against {pct(BASELINE_CHURN, 1)} baseline "
@@ -89,6 +90,7 @@ PLAYS = [
     ),
     dict(
         key="discouraged", mode="brief",
+        label=L("Discouraged", "Desanimado"),
         when=lambda r: bool(r.sig_discouraged) and not bool(r.sig_churn_threat),
         why=f"Noted as discouraged with results. {_c('discouraged')} of these churn, "
             f"{LIFT['discouraged'][2]:.2f}× the baseline. A cheerful message to someone who "
@@ -117,6 +119,7 @@ PLAYS = [
     ),
     dict(
         key="open_commitment", mode="draft",
+        label=L("Open commitment", "Compromiso pendiente"),
         when=lambda r: bool(r.commitment_open) and pd.notna(r.open_ask)
                        and (r.days_commitment_open or 0) >= 7,
         why="The doctor committed to something and nothing has moved since. Following up on "
@@ -132,6 +135,7 @@ PLAYS = [
     ),
     dict(
         key="hollow_calendar", mode="draft",
+        label=L("Agenda too thin", "Agenda muy delgada"),
         when=lambda r: bool(r.calendar_enabled)
                        and r.weekly_slots_published < RULES["calendar_healthy_slots"],
         why="Calendar on, almost nothing bookable. Doctors under {healthy} slots average "
@@ -149,6 +153,7 @@ PLAYS = [
     ),
     dict(
         key="complaint_no_patients", mode="draft",
+        label=L("Complained, and is right", "Se quejó y tiene razón"),
         when=lambda r: r.complaints >= 1 and bool(r.bottom_quartile),
         why="They have complained about patient volume and they are in fact in the bottom "
             "quartile of their specialty and city. The complaint is correct.",
@@ -163,6 +168,7 @@ PLAYS = [
     ),
     dict(
         key="visibility", mode="draft",
+        label=L("Not being found", "No lo encuentran"),
         when=lambda r: bool(r.demand_constrained),
         why="They have plenty of availability and it is not filling. Doctors in this state run at "
             "0.7 bookings per published slot against 8.0 for doctors whose agenda is genuinely "
@@ -184,6 +190,7 @@ PLAYS = [
     ),
     dict(
         key="calendar_off", mode="draft",
+        label=L("Calendar off", "Agenda apagada"),
         when=lambda r: not bool(r.calendar_enabled),
         why=f"Online calendar never turned on. {_c('calendar_off', 1)} churn against 5.3%.",
         why_es=f"Nunca activó la agenda en línea. {_c('calendar_off', 1)} se van, "
@@ -197,6 +204,7 @@ PLAYS = [
     ),
     dict(
         key="grade_d_recovery", mode="draft",
+        label=L("Grade D recovery", "Rescate de grado D"),
         when=lambda r: r.onboarding_grade == "D",
         why=f"Closed onboarding at grade D. {_c('grade_D', 1)} churn against 2.2% for A.",
         why_es=f"Cerró el onboarding en grado D. {_c('grade_D', 1)} se van, contra 2.2% "
@@ -210,6 +218,7 @@ PLAYS = [
     ),
     dict(
         key="upsell_lead", mode="handoff",
+        label=L("Upsell lead", "Oportunidad de upsell"),
         when=lambda r: isinstance(r.upsell_signal, str) and len(r.upsell_signal) > 0,
         why="The doctor asked about another product. Farming does not sell it and should not try.",
         why_es="El doctor preguntó por otro producto. Farming no lo vende y no debería "
@@ -227,6 +236,7 @@ PLAYS = [
     ),
     dict(
         key="gone_quiet", mode="draft",
+        label=L("Gone quiet", "Sin respuesta"),
         when=lambda r: pd.notna(r.days_since_contact)
                        and r.days_since_contact > RULES["stale_contact_days"]
                        and r.campaigns_enrolled > 0 and r.campaigns_engaged == 0,

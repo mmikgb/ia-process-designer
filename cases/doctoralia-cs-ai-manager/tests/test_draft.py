@@ -97,6 +97,7 @@ def test_no_draft_says_thursday_on_real_doctors():
 
 def test_every_play_has_both_languages():
     for p in D.PLAYS:
+        assert p["label"]["en"] and p["label"]["es"], p["key"]
         for k in ["why", "ask"]:
             assert p.get(k) and p.get(f"{k}_es"), (p["key"], k)
         if p["mode"] == "draft":

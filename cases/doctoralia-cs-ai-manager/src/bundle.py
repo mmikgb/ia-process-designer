@@ -20,12 +20,12 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import pipeline as P
 import notes as N
-import series, spc, forecast, insight, llm, kpi
+import series, spc, forecast, insight, llm, kpi, dayplan
 import draft as D
 
 OUT = ROOT / "out"
 CACHE = OUT / "bundles"
-SCHEMA_VERSION = "1.1"
+SCHEMA_VERSION = "1.2"
 
 REQUIRED = {
     "doctors": ["doctor_id", "signup_date", "status", "owner_specialist_id",
@@ -150,6 +150,7 @@ def build(xlsx: Path | None = None, use_llm: bool = True, cache: bool = True) ->
         "escalations": frame(esc),
         "teams": frame(t["teams"]),
         "campaigns": frame(t["campaigns"]),
+        "enrollments": frame(t["campaign_enrollments"]),
         "bookings": frame(t["bookings_monthly"].astype({"mp": str})),
         "interactions": frame(t["interactions"]),
         "series": ser,
@@ -200,8 +201,14 @@ def web_view(b: dict, top: int = 12) -> dict:
     people = [{"id": k, "name": v["specialist_name"], "team": teams.get(v["team_id"], "")}
               for k, v in sp.items() if v.get("role") == "Farming Specialist"]
     return {
-        "meta": {k: b["meta"][k] for k in
-                 ["built_at", "source_file", "source_sha256_16", "extract_date"]},
+        "meta": {**{k: b["meta"][k] for k in
+                    ["built_at", "source_file", "source_sha256_16", "extract_date"]},
+                 "asof": P.RULES["extract_date"],
+                 "queue_capacity": P.RULES["daily_capacity"],
+                 "followup_quota": P.RULES["daily_followup_quota"],
+                 # priority order comes from PLAYS: the UI can say so, and show it
+                 "plays": [{"key": p["key"], "mode": p["mode"], "label": p["label"]}
+                           for p in D.PLAYS]},
         "rules": {k: b["meta"]["rules"][k] for k in WEB_RULES},
         # the whole book at the default period, kept for screens that do not filter
         "kpi": b["kpi"],
@@ -244,7 +251,11 @@ DOSSIER_FIELDS = ["doctor_id", "doctor_name", "specialty", "city", "status", "si
                   "closed_at_cap", "sig_onboarding_no_show", "calendar_enabled",
                   "weekly_slots_published", "bookings_avg", "bookings_per_slot",
                   "pct_specialty_city", "median_specialty_city", "days_since_contact",
-                  "risk_score", "risk_reasons", "top_signal", "top_signal_at", "top_signal_note"]
+                  "risk_score", "top_signal", "top_signal_at", "top_signal_note"]
+# Web size budget (SPEC T1.7: web/public data < 20 MB). Nothing below loses information:
+# the English copilot texts live inside copilot.i18n, risk reasons inside
+# risk_reasons_i18n, and contacts_all is written only when it adds to contacts.
+CONTACTS_PANEL = 6
 
 
 def _num(v):
@@ -253,52 +264,129 @@ def _num(v):
     return round(v, 3) if isinstance(v, float) else v
 
 
-def dossiers(b: dict) -> dict[str, list]:
+def _groups(rows: list[dict], key: str = "doctor_id") -> dict[str, list[dict]]:
+    g: dict[str, list[dict]] = {}
+    for r in rows:
+        g.setdefault(r[key], []).append(r)
+    return g
+
+
+def web_doctors(b: dict) -> tuple[pd.DataFrame, dict, dict, dict]:
+    """The doctor rows as the web files see them, with the copilot output and the
+    flags computed once, so dossiers, queues and search cannot disagree."""
+    doc = pd.DataFrame(b["doctors"])
+    names = {s["specialist_id"]: s["specialist_name"] for s in b["specialists"]}
+    asof = pd.Timestamp(P.RULES["extract_date"])
+    copilot, flags = {}, {}
+    for _, r in doc.iterrows():
+        first = names.get(r.owner_specialist_id, "su especialista").split()[0]
+        copilot[r.doctor_id] = D.compose(r, first)
+        flags[r.doctor_id] = dayplan.flags(r, P.RULES, asof)
+    return doc, names, copilot, flags
+
+
+def dossiers(b: dict, doc: pd.DataFrame, copilot: dict, flags: dict) -> dict[str, list]:
     """One file per owner: what the doctor panel shows, with the copilot's draft.
 
     The draft comes from draft.compose, the same call the Streamlit card makes,
     so the web panel and the Streamlit card cannot disagree about what to send.
     """
-    doc = pd.DataFrame(b["doctors"])
-    names = {s["specialist_id"]: s["specialist_name"] for s in b["specialists"]}
     bk = pd.DataFrame(b["bookings"]).sort_values("month").groupby("doctor_id")
-    it = (pd.DataFrame(b["interactions"]).sort_values("occurred_at", ascending=False)
-          .groupby("doctor_id").head(6).groupby("doctor_id"))
     bk_d = {k: g[["month", "patient_bookings", "admin_bookings"]].to_dict("records") for k, g in bk}
-    it_d = {k: g[["occurred_at", "channel", "direction", "specialist_id", "note"]]
-            .to_dict("records") for k, g in it}
+    cols = ["occurred_at", "channel", "direction", "specialist_id", "note"]
+    it = (pd.DataFrame(b["interactions"]).sort_values(["occurred_at", "interaction_id"],
+                                                      ascending=False))
+    it_d = {k: g[cols].to_dict("records") for k, g in it.groupby("doctor_id", sort=False)}
+    camp = {c["campaign_id"]: c.get("ask") for c in b["campaigns"]}
+    enr_d = _groups(sorted(b.get("enrollments", []), key=lambda e: e["enrolled_at"] or "",
+                           reverse=True))
+    esc_d = _groups(sorted(b["escalations"], key=lambda e: e["escalated_at"] or "", reverse=True))
     out: dict[str, list] = {}
     for _, r in doc.iterrows():
-        first = names.get(r.owner_specialist_id, "su especialista").split()[0]
-        res = D.compose(r, first)
+        res = copilot[r.doctor_id]
         d = {k: _num(r[k]) for k in DOSSIER_FIELDS}
         d["bookings"] = bk_d.get(r.doctor_id, [])
-        d["contacts"] = it_d.get(r.doctor_id, [])
+        d["bookings_last"] = _num(r.bookings_last)
+        d["bookings_prev"] = _num(r.bookings_prev)
+        allc = it_d.get(r.doctor_id, [])
+        d["contacts"] = allc[:CONTACTS_PANEL]
+        if len(allc) > CONTACTS_PANEL:          # absent = contacts is already every contact
+            d["contacts_all"] = allc
+        # `converted` is empty for ~95% of enrollments: null means "no recorded outcome",
+        # never "no". The campaigns sheet has no name column; `ask` is its description.
+        d["campaigns"] = [{"campaign_id": e["campaign_id"], "name": camp.get(e["campaign_id"]),
+                           "enrolled_at": e["enrolled_at"], "engaged": e["engaged"],
+                           "converted": e["converted"]} for e in enr_d.get(r.doctor_id, [])]
+        d["escalations"] = [{"escalated_at": e["escalated_at"],
+                             "minutes_to_pickup": e["minutes_to_pickup"],
+                             "converted": e["converted"], "handler": e["specialist_id"]}
+                            for e in esc_d.get(r.doctor_id, [])]
+        d["followup"] = ({"due_at": r.followup_due_at, "kind": r.followup_kind,
+                          "note": r.followup_note, "set_at": r.followup_set_at,
+                          "set_by": r.followup_set_by}
+                         if isinstance(r.followup_due_at, str) else None)
+        d["flags"] = flags[r.doctor_id]
+        d["risk_reasons_i18n"] = r.risk_reasons_i18n if isinstance(r.risk_reasons_i18n, list) else []
         d["copilot"] = {k: res[k] for k in
-                        ["mode", "play", "why", "ask", "draft", "instead", "channel",
-                         "confident", "confidence", "gaps"]}
+                        ["mode", "play", "draft", "confident", "confidence", "i18n"]}
         out.setdefault(r.owner_specialist_id, []).append(d)
     return out
 
 
-def write_web_view(b: dict) -> Path:
+# Short keys keep search.json under 1 MB; the mapping is SearchRowRaw in web/lib/types.ts.
+SEARCH_KEYS = {"id": "i", "name": "n", "specialty": "s", "city": "c", "owner": "o",
+               "status": "st", "play": "p", "mode": "m", "risk": "r", "flags": "f"}
+
+
+def search_rows(doc: pd.DataFrame, copilot: dict, flags: dict) -> list[dict]:
+    """One row per doctor for the command palette and the /doctores list (§5.2)."""
+    rows = [{"id": r.doctor_id, "name": r.doctor_name, "specialty": r.specialty, "city": r.city,
+             "owner": r.owner_specialist_id, "status": r.status,
+             "play": copilot[r.doctor_id]["play"], "mode": copilot[r.doctor_id]["mode"],
+             "risk": _num(r.risk_score), "flags": flags[r.doctor_id]}
+            for _, r in doc.iterrows()]
+    return [{SEARCH_KEYS[k]: v for k, v in x.items()} for x in rows]
+
+
+def _dump(path: Path, obj) -> None:
+    path.write_text(json.dumps(_clean(obj), ensure_ascii=False, separators=(",", ":")))
+
+
+def write_web_view(b: dict) -> dict:
+    """Writes every web file into out/ and, when web/ sits next door, into the app,
+    so a running `pnpm dev` hot-reloads after a rebuild: edit a rule, rebuild, the
+    page moves. Returns the paths and the queues (for the size report)."""
     OUT.mkdir(exist_ok=True)
+    doc, names, copilot, flags = web_doctors(b)
+
     dd = OUT / "doctors"
-    dd.mkdir(exist_ok=True)
-    for owner, rows in dossiers(b).items():
-        (dd / f"{owner}.json").write_text(json.dumps(_clean(rows), ensure_ascii=False,
-                                                     separators=(",", ":")))
+    shutil.rmtree(dd, ignore_errors=True)
+    dd.mkdir()
+    for owner, rows in dossiers(b, doc, copilot, flags).items():
+        _dump(dd / f"{owner}.json", rows)
+
+    qd = OUT / "queue"
+    shutil.rmtree(qd, ignore_errors=True)
+    qd.mkdir()
+    queues = dayplan.build(doc, b["predict"]["watchlist"], P.RULES, P.RULES["extract_date"],
+                           copilot, names)
+    for owner, q in queues.items():
+        _dump(qd / f"{owner}.json", q)
+
+    sp = OUT / "search.json"
+    _dump(sp, search_rows(doc, copilot, flags))
     p = OUT / "overview.json"
     p.write_text(json.dumps(web_view(b), ensure_ascii=False, separators=(",", ":")))
-    # Hand the same files to the web app when it sits next door, so a running
-    # `pnpm dev` hot-reloads after a rebuild: edit a rule, rebuild, the page moves.
+
     web = ROOT / "web"
     if web.is_dir():
         (web / "data").mkdir(exist_ok=True)
         shutil.copyfile(p, web / "data" / "overview.json")
-        shutil.rmtree(web / "public" / "doctors", ignore_errors=True)
-        shutil.copytree(dd, web / "public" / "doctors")
-    return p
+        for name in ["doctors", "queue"]:
+            shutil.rmtree(web / "public" / name, ignore_errors=True)
+            shutil.copytree(OUT / name, web / "public" / name)
+        shutil.copyfile(sp, web / "public" / "search.json")
+    return {"overview": p, "search": sp, "queues": queues}
 
 
 def load_bundle(path: Path | None = None) -> dict:
@@ -332,5 +420,19 @@ if __name__ == "__main__":
           f"${b['llm']['estimate']['total_usd']}")
     print(f"  bundle size {len(json.dumps(b))/1e6:.1f} MB -> out/app_data.json")
     wv = write_web_view(b)
-    print(f"  web view {wv.stat().st_size/1e3:.1f} KB -> out/overview.json"
-          + (" (and web/data)" if (ROOT / "web").is_dir() else ""))
+    print(f"  web view {wv['overview'].stat().st_size/1e3:.1f} KB -> out/overview.json"
+          + (" (and web/data, web/public)" if (ROOT / "web").is_dir() else ""))
+    print(f"  search {wv['search'].stat().st_size/1e3:.1f} KB -> out/search.json")
+    print(f"\n  the day per specialist (capacity {P.RULES['daily_capacity']}, follow-up quota "
+          f"{P.RULES['daily_followup_quota']}, stale after {P.RULES['followup_stale_days']} days)")
+    print("  owner  | before capacity: call followup message handoff later "
+          "| today: call followup message handoff | later (past lead, over capacity)")
+    for s in dayplan.summary(wv["queues"]):
+        print(f"  {s['owner']:6} | {s['call_all']:4} {s['followup_all']:8} {s['message_all']:7} "
+              f"{s['handoff_all']:7} {s['later_all']:5} | {s['call_today']:4} "
+              f"{s['followup_today']:8} {s['message_today']:7} {s['handoff_today']:7} | "
+              f"{s['later']:4} ({s['later_past_lead']}, {s['later_capacity']})")
+    pub = ROOT / "web" / "public"
+    if pub.is_dir():
+        size = sum(f.stat().st_size for f in pub.rglob("*.json"))
+        print(f"\n  web/public data {size/1e6:.1f} MB")

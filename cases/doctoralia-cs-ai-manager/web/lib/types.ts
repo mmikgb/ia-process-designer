@@ -5,6 +5,10 @@ export interface Meta {
   source_file: string
   source_sha256_16: string
   extract_date: string
+  asof: string
+  queue_capacity: number
+  followup_quota: number
+  plays: { key: string; mode: "draft" | "brief" | "handoff"; label: I18n }[] // in PLAYS order
 }
 
 export interface KpiItem {
@@ -211,6 +215,18 @@ export interface Cost {
 }
 
 /** One doctor, as the panel shows it. Written per owner by bundle.py (out/doctors/<owner>.json). */
+export type Flag =
+  | "at_risk" | "may_cancel" | "discouraged" | "hollow" | "not_found"
+  | "commitment" | "followup_due" | "calendar_off" | "grade_d" | "upsell"
+
+export interface Contact {
+  occurred_at: string
+  channel: string
+  direction: string
+  specialist_id: string
+  note: string | null
+}
+
 export interface Dossier {
   doctor_id: string
   doctor_name: string
@@ -232,25 +248,83 @@ export interface Dossier {
   median_specialty_city: number | null
   days_since_contact: number | null
   risk_score: number
-  risk_reasons: string | null
+  risk_reasons_i18n: { key: string; text: I18n }[]
   top_signal: string | null
   top_signal_at: string | null
   top_signal_note: string | null
   bookings: { month: string; patient_bookings: number; admin_bookings: number }[]
-  contacts: { occurred_at: string; channel: string; direction: string; specialist_id: string; note: string | null }[]
+  bookings_last: number | null
+  bookings_prev: number | null
+  contacts: Contact[] // newest first, at most 6
+  contacts_all?: Contact[] // every contact, newest first; absent when `contacts` already is every contact
+  campaigns: { campaign_id: string; name: string | null; enrolled_at: string; engaged: boolean; converted: boolean | null }[]
+  escalations: { escalated_at: string; minutes_to_pickup: number; converted: boolean; handler: string }[]
+  followup: { due_at: string; kind: string; note: string; set_at: string; set_by: string } | null
+  flags: Flag[]
   copilot: {
     mode: "draft" | "brief" | "handoff" | null
     play: string | null
-    why: string | null
-    ask: string | null
-    draft: string | null
-    instead: string | null
-    channel: string | null
+    draft: string | null // always Spanish (usted)
     confident: boolean
     confidence: number
-    gaps: string[]
+    // English and Spanish for everything the specialist reads (the English is only here)
+    i18n: { why: I18n | null; ask: I18n | null; instead: I18n | null; channel: I18n | null; gaps: I18n[] }
   }
 }
+
+// public/queue/<owner>.json (SPEC §5.1)
+export type Block = "call" | "followup" | "message" | "handoff" | "later"
+export interface QueueItem {
+  doctor_id: string
+  doctor_name: string
+  specialty: string
+  city: string
+  block: Block
+  rank: number // 1..n within the owner's day
+  play: string | null
+  mode: "draft" | "brief" | "handoff" | null
+  reason: I18n // one line, "why today"
+  risk_score: number
+  due_at?: string // follow-ups
+  signal_at?: string // calls
+  lead_median?: number
+  days_of_lead_left?: number // at asof; the UI subtracts dayOffset
+  confident: boolean
+  later_reason?: I18n // why it is not in today's plan
+  origin?: "followup" | "message" | null // later items pushed out by capacity: the block they came from
+}
+export interface QueueFile {
+  owner: string
+  asof: string
+  capacity: number
+  followup_quota: number
+  counts: Record<Block, number> // before capacity is applied
+  items: QueueItem[] // ordered: call, followup, message, handoff, later
+}
+
+// public/search.json (SPEC §5.2), written with short keys to stay under 1 MB
+export interface SearchRowRaw {
+  i: string // id
+  n: string // name
+  s: string // specialty
+  c: string // city
+  o: string // owner
+  st: "active" | "churned" // status
+  p: string | null // play
+  m: string | null // mode
+  r: number // risk
+  f: Flag[] // flags
+}
+export interface SearchRow {
+  id: string; name: string; specialty: string; city: string
+  owner: string; status: "active" | "churned"
+  play: string | null; mode: string | null; risk: number
+  flags: Flag[]
+}
+export const searchRow = (x: SearchRowRaw): SearchRow => ({
+  id: x.i, name: x.n, specialty: x.s, city: x.c, owner: x.o, status: x.st,
+  play: x.p, mode: x.m, risk: x.r, flags: x.f,
+})
 
 export interface TeamRow {
   id: string

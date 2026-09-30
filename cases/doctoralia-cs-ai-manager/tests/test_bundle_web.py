@@ -1,0 +1,59 @@
+"""bundle.py web files: queues, search and dossiers match SPEC §5. Reads out/ after a build."""
+import json
+from pathlib import Path
+
+import pytest
+
+from pipeline import RULES
+
+OUT = Path(__file__).resolve().parent.parent / "out"
+ITEM_KEYS = {"doctor_id", "doctor_name", "specialty", "city", "block", "rank", "play", "mode",
+             "reason", "risk_score", "confident"}
+
+
+@pytest.fixture(scope="module")
+def files():
+    if not (OUT / "search.json").exists():
+        pytest.skip("run python3 src/bundle.py first")
+    queues = {p.stem: json.loads(p.read_text()) for p in (OUT / "queue").glob("*.json")}
+    dossiers = [d for p in (OUT / "doctors").glob("*.json") for d in json.loads(p.read_text())]
+    return queues, json.loads((OUT / "search.json").read_text()), dossiers
+
+
+def test_one_queue_per_farming_specialist(files):
+    queues = files[0]
+    assert sorted(queues) == [f"S{i:02d}" for i in range(1, 15)]
+    for owner, q in queues.items():
+        assert q["owner"] == owner and q["asof"] == RULES["extract_date"]
+        assert q["capacity"] == RULES["daily_capacity"]
+        assert q["followup_quota"] == RULES["daily_followup_quota"]
+        for x in q["items"]:
+            assert ITEM_KEYS <= set(x), set(x) ^ ITEM_KEYS
+
+
+def test_search_has_every_doctor_and_short_keys(files):
+    search, dossiers = files[1], files[2]
+    assert len(search) == len(dossiers) == 5571
+    assert set(search[0]) == {"i", "n", "s", "c", "o", "st", "p", "m", "r", "f"}
+    assert (OUT / "search.json").stat().st_size < 1_000_000
+
+
+def test_dossier_additions(files):
+    dossiers = files[2]
+    d = next(x for x in dossiers if x["followup"])
+    for k in ["campaigns", "escalations", "followup", "flags", "risk_reasons_i18n",
+              "bookings_last", "bookings_prev", "contacts"]:
+        assert k in d
+    assert set(d["copilot"]["i18n"]) == {"why", "ask", "instead", "channel", "gaps"}
+    many = [x for x in dossiers if "contacts_all" in x]
+    assert many and all(len(x["contacts_all"]) > 6 and x["contacts"] == x["contacts_all"][:6]
+                        for x in many)
+    assert all(len(x["contacts"]) <= 6 for x in dossiers)
+    # converted is null when no outcome was recorded, never coerced to false
+    assert any(c["converted"] is None for x in dossiers for c in x["campaigns"])
+
+
+def test_flags_agree_between_search_and_dossiers(files):
+    search, dossiers = files[1], files[2]
+    f = {x["doctor_id"]: x["flags"] for x in dossiers}
+    assert all(f[r["i"]] == r["f"] for r in search)
