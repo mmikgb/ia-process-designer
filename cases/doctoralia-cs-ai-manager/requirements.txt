@@ -1,0 +1,6 @@
+pandas>=2.0
+openpyxl>=3.1
+pyarrow>=14
+streamlit>=1.30
+keyring>=24          # stores the API key in the macOS Keychain
+anthropic>=0.40      # optional — everything runs without it

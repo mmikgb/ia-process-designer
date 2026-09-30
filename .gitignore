@@ -1,0 +1,24 @@
+# --- CONFIDENCIAL: el dataset de Doctoralia nunca se sube ---
+# El business case dice: "Do not share it, store it outside your own device,
+# or reuse it elsewhere." Se queda solo en tu Mac.
+**/data/*.xlsx
+**/data/*.csv
+*.xlsx
+
+# Secretos
+.env
+.env.*
+*.key
+
+# Generado — se reconstruye con: python3 src/bundle.py
+**/out/
+**/.venv/
+*.db
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store

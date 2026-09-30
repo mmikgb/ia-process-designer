@@ -1,0 +1,98 @@
+{
+  "id": "doctoralia-cs-ai-manager",
+  "title": "Doctoralia México CS — AI & Transformation Manager business case",
+  "playbook": "process-improvement-ai",
+  "status": "active",
+  "created": "2026-09-29",
+  "brief": {
+    "problem": "Two working deliverables on one dataset for a take-home + 60-minute live session: a copilot for a farming CS specialist and an automated manager report. Judged on whether it runs, whether the AI's failure modes are designed for, and whether the thinking about the data holds up under questioning.",
+    "actors": ["Farming specialists (14, 6 take escalations)", "Team managers (3 farming teams)", "CS Director (Alan Martinez)", "Individual doctors in Mexico (5,571)"],
+    "currentState": "Onboarding grade is a proxy for one setup step; campaign 4 scores conversions that make doctors worse off; escalation conversion varies 31-51% by specialist purely on queue latency; ~6% of escalations have no owner.",
+    "desiredState": "Two connected products that run from one data layer, plus a defensible account of what the data says and where AI is allowed to be wrong.",
+    "successMetric": {"name": "Session outcome", "baseline": null, "target": "Both products run, survive a live change request, and the three findings hold under challenge"},
+    "constraints": [
+      "Must run live and be editable in front of the panel in 10 minutes",
+      "Two connected things beat two polished disconnected ones",
+      "No real data from anywhere else",
+      "Must state AI tools used and what was corrected"
+    ],
+    "alreadyTried": [],
+    "risks": [
+      "Demo fails on the panel's machine — mitigated by zero-API-key default path",
+      "A live change request lands somewhere the code is not navigable — mitigated by RULES and PLAYS as single edit points"
+    ]
+  },
+  "buildProfile": {
+    "surface": "desktop",
+    "outputLanguage": "en",
+    "stack": "python-pandas-streamlit",
+    "data": "flat files",
+    "users": "just me",
+    "horizon": "one week",
+    "modelAccess": "claude api, optional"
+  },
+  "phases": [
+    {"id": "p1", "name": "Read the data", "objective": "Find what cannot be explained as presented",
+     "input": "dataset.xlsx + business case PDF", "output": "FINDINGS.md",
+     "gate": "Every claim recomputable by one command", "status": "done",
+     "artifacts": ["a1", "a2"], "decisions": ["d1"]},
+    {"id": "p2", "name": "Shared data layer", "objective": "One place any number can come from",
+     "input": "dataset.xlsx", "output": "out/*.parquet + data_quality.json",
+     "gate": "Copilot and report recompute nothing", "status": "done",
+     "artifacts": ["a3"], "decisions": ["d2"]},
+    {"id": "p3", "name": "Copilot", "objective": "A draft a specialist would actually send, and a defined behaviour when unsure",
+     "input": "doctor_features", "output": "src/copilot.py + src/draft.py",
+     "gate": "Runs with no API key; refuses to draft below 0.55 confidence", "status": "done",
+     "artifacts": ["a4"], "decisions": ["d3", "d4"]},
+    {"id": "p4", "name": "Manager report", "objective": "Something a manager acts on Monday with their own people",
+     "input": "escalation_features + specialist_features", "output": "out/report_T*.html",
+     "gate": "Explains a movement or says it cannot; no rate below n=10", "status": "done",
+     "artifacts": ["a5"], "decisions": ["d5"]},
+    {"id": "p5", "name": "Session rehearsal", "objective": "Survive Part A, B and C questions and one live change",
+     "input": "all of the above", "output": "answers + a rehearsed live edit",
+     "gate": "A live change to PLAYS or RULES lands in under 10 minutes", "status": "todo",
+     "artifacts": [], "decisions": []}
+  ],
+  "decisions": [
+    {"id": "d1", "type": "approach", "question": "Trust the model's reading of the tables, or recompute everything?",
+     "options": [{"label": "Recompute in code", "buys": "Every claim falsifiable in one command", "costs": "Slower"},
+                 {"label": "Trust the model", "buys": "Speed", "costs": "A wrong number in front of the panel"}],
+     "chosen": "Recompute in code", "rationale": "Two of the model's first figures were wrong. src/analysis.py is the guard.",
+     "reversibility": "cheap", "decidedAt": "2026-09-29"},
+    {"id": "d2", "type": "technical", "question": "How do the two deliverables share data?",
+     "options": [{"label": "One pipeline writing feature tables", "buys": "They cannot disagree", "costs": "A build step"},
+                 {"label": "Each reads the workbook", "buys": "Fewer moving parts", "costs": "Two versions of every number"}],
+     "chosen": "One pipeline writing feature tables", "rationale": "The brief explicitly rewards a shared data layer.",
+     "reversibility": "expensive", "decidedAt": "2026-09-29"},
+    {"id": "d3", "type": "approach", "question": "Does the model generate the draft, or only rewrite it?",
+     "options": [{"label": "Template composes, model polishes tone", "buys": "The model can never state a false fact; runs with no API key", "costs": "Drafts are less varied"},
+                 {"label": "Model generates from the record", "buys": "More natural", "costs": "Hallucinated account facts, and a demo that dies without a key"}],
+     "chosen": "Template composes, model polishes tone", "rationale": "The panel cares most about behaviour when the system is not confident. A model that cannot supply a fact cannot invent one.",
+     "reversibility": "cheap", "decidedAt": "2026-09-29"},
+    {"id": "d4", "type": "approach", "question": "What does confidence mean?",
+     "options": [{"label": "Evidence completeness", "buys": "Inspectable, explains itself in the specialist's terms", "costs": "Not calibrated probability"},
+                 {"label": "Model self-reported certainty", "buys": "Sounds sophisticated", "costs": "Uncorrelated with being right"}],
+     "chosen": "Evidence completeness", "rationale": "A specialist can act on 'no complete booking month yet'. They cannot act on 0.71.",
+     "reversibility": "cheap", "decidedAt": "2026-09-29"},
+    {"id": "d5", "type": "scope", "question": "Which metrics go on the manager report?",
+     "options": [{"label": "Pickup latency + the control column", "buys": "Points at the real lever", "costs": "Less familiar than a leaderboard"},
+                 {"label": "Conversion leaderboard", "buys": "Familiar", "costs": "Coaches the wrong six people"}],
+     "chosen": "Pickup latency + the control column", "rationale": "Within the 30-minute bucket every specialist converts 50-59%. The leaderboard measures the queue.",
+     "reversibility": "cheap", "decidedAt": "2026-09-29"}
+  ],
+  "artifacts": [
+    {"id": "a1", "kind": "document", "phase": "p1", "path": "FINDINGS.md"},
+    {"id": "a2", "kind": "script", "phase": "p1", "path": "src/analysis.py"},
+    {"id": "a3", "kind": "pipeline", "phase": "p2", "path": "src/pipeline.py"},
+    {"id": "a4", "kind": "prototype", "phase": "p3", "path": "src/copilot.py"},
+    {"id": "a5", "kind": "prototype", "phase": "p4", "path": "src/report.py"}
+  ],
+  "runLog": [
+    {"at": "2026-09-29", "phase": "p1", "did": "Full data pass; three findings plus seven data-quality flags", "gateMet": true,
+     "learned": "The three headline anomalies in the pack are all the same failure: a proxy metric standing in for an outcome."},
+    {"at": "2026-09-29", "phase": "p2", "did": "Pipeline with RULES dict and automatic quality checks", "gateMet": true, "learned": ""},
+    {"at": "2026-09-29", "phase": "p3", "did": "Copilot with 5 plays, evidence-completeness confidence, optional LLM polish", "gateMet": true, "learned": "45% of a portfolio has no signal. Saying 'leave it alone' is an output."},
+    {"at": "2026-09-29", "phase": "p4", "did": "Per-team HTML report with mix/rate/residual decomposition and n>=10 rate suppression", "gateMet": true,
+     "learned": "First version attributed 130% of a movement. Decompositions need a residual and a publish band."}
+  ]
+}
