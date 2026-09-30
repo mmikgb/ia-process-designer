@@ -10,6 +10,8 @@ import { blocked, type Meta } from "@/lib/ai/gateway"
 import { guard } from "@/lib/ai/guard"
 import { MODELS, price, usesFallbacks } from "@/lib/ai/models"
 import { system, VERSIONS } from "@/lib/ai/prompts"
+import { en } from "@/lib/i18n/en"
+import { es, type Key } from "@/lib/i18n/es"
 import { writeLedger } from "@/lib/server/ledger"
 import type { Locale } from "@/lib/tx"
 import type { Block, Flag, SearchRow } from "@/lib/types"
@@ -218,7 +220,9 @@ function suggested(i: AskInput): AskAction[] {
   return lists.map((f) => ({ type: "open_list" as const, filters: { ...owner, flag: f } }))
 }
 
-function offText(reason: string, l: Locale) {
+function offText(code: string, l: Locale) {
+  const dict: Record<string, string> = l === "es" ? es : en
+  const reason = dict[`ai.reason.${code}` as Key] ?? dict["ai.reason.other"]
   return T(
     l,
     `The assistant is off (${reason}). These lists answer the usual questions:`,

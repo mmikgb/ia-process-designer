@@ -10,7 +10,7 @@ export const metadata = { title: "Costo IA · CS Control Room" }
 export default function Page() {
   return (
     <Framed title="nav.cost" subtitle="cost.subtitle">
-      <CostScreen data={data} />
+      <CostScreen cost={data.cost} />
     </Framed>
   )
 }

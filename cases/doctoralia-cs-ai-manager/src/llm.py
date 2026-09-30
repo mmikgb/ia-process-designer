@@ -42,6 +42,35 @@ REPLACED = {"claude-sonnet-4-5": MODEL_DEEP, "claude-haiku-4-5": MODEL_FAST,
             "claude-opus-4-5": "claude-opus-5-5"}
 BATCH_DISCOUNT = 0.5
 
+# The daily tool's AI use per specialist (SPEC_Daily_Tool T4.8). The web tasks run these;
+# the estimate below is the only place the monthly figure is computed.
+WORKING_DAYS = 21
+RECOMMENDED_BUDGET_USD = 75.0   # for 14 specialists; settings.json keeps 25 for the demo
+USAGE_V2 = [
+    # task, tier, calls per specialist per day, tokens in, tokens out, note
+    ("message", "fast", 10, 1200, 200, None),
+    ("briefing", "fast", 1, 3000, 300, "cached"),
+    ("explain", "fast", 3, 1500, 150, None),
+    ("doctor", "deep", 5, 4000, 700, None),
+    ("ask", "deep", 3, 8000, 500, "context cached"),
+]
+
+
+def usage_estimate(specialists: int, days: int = WORKING_DAYS) -> dict:
+    """Monthly cost of the daily tool from USAGE_V2 and PRICES, before prompt-cache savings."""
+    model = {"fast": MODEL_FAST, "deep": MODEL_DEEP}
+    rows = []
+    for task, tier, per_day, tin, tout, note in USAGE_V2:
+        call = price(model[tier], tin, tout)
+        rows.append({"task": task, "tier": tier, "model": model[tier], "per_day": per_day,
+                     "tokens_in": tin, "tokens_out": tout, "note": note,
+                     "usd_per_call": round(call, 6),
+                     "usd_month": round(call * per_day * days, 4)})
+    per = sum(r["usd_month"] for r in rows)
+    return {"rows": rows, "working_days": days, "specialists": specialists,
+            "per_specialist_usd": round(per, 2), "team_usd": round(per * specialists, 2),
+            "recommended_budget_usd": RECOMMENDED_BUDGET_USD}
+
 
 @dataclass
 class Result:

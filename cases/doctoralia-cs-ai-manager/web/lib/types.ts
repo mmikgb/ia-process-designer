@@ -213,6 +213,15 @@ export interface Cost {
   monthly_budget_usd: number | null
   notes_total: number | null
   farming_specialists: number
+  /** src/llm.py usage_estimate(): the daily tool's monthly cost, before prompt-cache savings */
+  usage_v2: {
+    rows: { task: string; tier: "fast" | "deep"; model: string; per_day: number; tokens_in: number; tokens_out: number; note: string | null; usd_per_call: number; usd_month: number }[]
+    working_days: number
+    specialists: number
+    per_specialist_usd: number
+    team_usd: number
+    recommended_budget_usd: number
+  }
 }
 
 /** One doctor, as the panel shows it. Written per owner by bundle.py (out/doctors/<owner>.json). */

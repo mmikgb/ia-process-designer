@@ -78,10 +78,15 @@ above it". That is a deliberate output, not a gap.
 
 ## Cost
 
-About **$0.10 per specialist per month** at 15 drafts a day with half polished by the model
-(Haiku, ~180 input / ~80 output tokens per call, 21 working days). The wasteful design — full
-LLM generation over every account monthly on a frontier model — still lands near $5. Model
-cost is not the constraint at this scale; specialist time is. Assumptions are in FINDINGS.md §6.
+About **$3.60 per specialist per month, ~$50 for 14 specialists**, for the daily tool as
+designed: 10 message rewrites, 1 briefing and 3 "Explícame" on the fast model (Haiku), 5 doctor
+analyses and 3 questions to the assistant on the deep model (Sonnet 5.5), 21 working days, before
+prompt-cache savings. The figure is computed in `src/llm.py` (`usage_estimate`, from the usage
+table and `PRICES`) and shown on `/costo`, next to the live spend from the ledger. Recommended
+budget: **$75/month** for the whole team; the demo's `settings.json` default stays $25, and at
+100% calls stop and every screen falls back to its deterministic version. Model cost is not the
+constraint at this scale; specialist time is. The one-off enrichment assumptions are in
+FINDINGS.md §6.
 
 ## What I did not build, and why
 

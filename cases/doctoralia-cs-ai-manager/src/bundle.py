@@ -236,6 +236,8 @@ def web_view(b: dict, top: int = 12) -> dict:
             "notes_total": b["meta"]["row_counts"].get("interactions"),
             "farming_specialists": sum(1 for s in b["specialists"]
                                        if s.get("role") == "Farming Specialist"),
+            "usage_v2": llm.usage_estimate(sum(1 for s in b["specialists"]
+                                               if s.get("role") == "Farming Specialist")),
         },
         "predict": {
             "ceiling": b["predict"]["ceiling"],
