@@ -1,7 +1,12 @@
-import { SimpleScreen } from "@/components/screens/simple"
+import { DoctorsScreen } from "@/components/doctors/doctors-screen"
+import { Framed } from "@/components/screens/simple"
 
 export const metadata = { title: "Doctores · CS Control Room" }
 
 export default function DoctorsPage() {
-  return <SimpleScreen title="nav.doctors" subtitle="doctors.subtitle" phase={5} />
+  return (
+    <Framed title="nav.doctors" subtitle="doctors.subtitle">
+      <DoctorsScreen />
+    </Framed>
+  )
 }

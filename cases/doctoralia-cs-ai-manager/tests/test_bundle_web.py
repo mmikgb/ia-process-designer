@@ -34,7 +34,12 @@ def test_one_queue_per_farming_specialist(files):
 def test_search_has_every_doctor_and_short_keys(files):
     search, dossiers = files[1], files[2]
     assert len(search) == len(dossiers) == 5571
-    assert set(search[0]) == {"i", "n", "s", "c", "o", "st", "p", "m", "r", "f"}
+    required = {"i", "n", "s", "c", "o", "p", "m", "r", "f"}
+    optional = {"st", "lc", "fu", "a"}    # left out when empty ("st" when active)
+    assert all(required <= set(x) <= required | optional for x in search)
+    assert all(x[k] not in (None, 0) for x in search for k in optional if k in x)
+    assert {x.get("st", "active") for x in search} == {"active", "churned"}
+    assert not any(x.get("st") == "active" for x in search)
     assert (OUT / "search.json").stat().st_size < 1_000_000
 
 
@@ -55,8 +60,9 @@ def test_dossier_additions(files):
 
 def test_flags_agree_between_search_and_dossiers(files):
     search, dossiers = files[1], files[2]
+    from dayplan import FLAGS          # search.json "f" is a bitmask in this order
     f = {x["doctor_id"]: x["flags"] for x in dossiers}
-    assert all(f[r["i"]] == r["f"] for r in search)
+    assert all(f[r["i"]] == [k for n, k in enumerate(FLAGS) if r["f"] >> n & 1] for r in search)
 
 
 def test_read_work_log_applies_undo(tmp_path, monkeypatch):

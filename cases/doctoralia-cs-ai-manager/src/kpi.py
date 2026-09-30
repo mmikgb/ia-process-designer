@@ -14,6 +14,25 @@ from i18n import L, pct
 WINDOW = 30   # days for "current"; the same length immediately before is "previous"
 BUCKETS = ["<30m", "30-60m", "60-120m", "120m+"]
 
+# The attention signals. One definition: the attention list sizes them, and bundle.py
+# tags every doctor with the keys they carry, so /doctores?signal=… lists the same people.
+ATTENTION = [
+    ("churn_threat", "Said they may cancel", lambda d: d.sig_churn_threat),
+    ("discouraged", "Discouraged with results", lambda d: d.sig_discouraged),
+    ("grade_d", "Closed onboarding at grade D", lambda d: d.onboarding_grade == "D"),
+    ("bottom_q", "Bottom quartile vs their peers", lambda d: d.bottom_quartile),
+    ("calendar_off", "Calendar never turned on", lambda d: ~d.calendar_enabled),
+    ("complaint", "Complained about volume or no-shows", lambda d: d.complaints >= 1),
+]
+
+# The risk bands of the segments bar, [lo, hi). /doctores?risk_band=… uses the same cuts.
+RISK_BANDS = [("healthy", "Healthy", 0, .15), ("watch", "Watch", .15, .3),
+              ("at_risk", "At risk", .3, .5), ("critical", "Critical", .5, 1.01)]
+
+
+def attention_masks(doc: pd.DataFrame) -> dict[str, pd.Series]:
+    return {k: pd.Series(f(doc), index=doc.index).fillna(False).astype(bool) for k, _, f in ATTENTION}
+
 
 def _kpi(key, label, value, prev, fmt="{:.0f}", good="up", spark=None, note="",
          n=None, prev_n=None, rate=False):
@@ -151,15 +170,10 @@ def build(t, doc, esc, ser, asof: pd.Timestamp, window: int = WINDOW, ctx: dict 
     # ---- attention list: the signals, sized, ranked by measured churn lift
     base = float((doc.status == "churned").mean())
     att = []
-    for key, label, mask in [
-        ("churn_threat", "Said they may cancel", doc.sig_churn_threat),
-        ("discouraged", "Discouraged with results", doc.sig_discouraged),
-        ("grade_d", "Closed onboarding at grade D", doc.onboarding_grade == "D"),
-        ("bottom_q", "Bottom quartile vs their peers", doc.bottom_quartile),
-        ("calendar_off", "Calendar never turned on", ~doc.calendar_enabled),
-        ("complaint", "Complained about volume or no-shows", doc.complaints >= 1),
-    ]:
-        m = doc[pd.Series(mask).fillna(False).astype(bool)]
+    masks = attention_masks(doc)
+    for key, label, _ in ATTENTION:
+        mask = masks[key]
+        m = doc[mask]
         if not len(m):
             continue
         ch = float((m.status == "churned").mean())
@@ -169,9 +183,8 @@ def build(t, doc, esc, ser, asof: pd.Timestamp, window: int = WINDOW, ctx: dict 
     att.sort(key=lambda x: -x["lift"])
 
     # ---- portfolio split, the segments bar
-    bands = [("Healthy", 0, .15), ("Watch", .15, .3), ("At risk", .3, .5), ("Critical", .5, 1.01)]
-    seg = [{"band": n, "n": int(((active.risk_score >= lo) & (active.risk_score < hi)).sum())}
-           for n, lo, hi in bands]
+    seg = [{"key": k, "band": n, "n": int(((active.risk_score >= lo) & (active.risk_score < hi)).sum())}
+           for k, n, lo, hi in RISK_BANDS]
     tot = sum(s["n"] for s in seg) or 1
     for s in seg:
         s["share"] = round(s["n"] / tot, 4)

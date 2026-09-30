@@ -29,7 +29,7 @@ SCHEMA_VERSION = "1.2"
 # The shape of the web view (overview.json, queue/, doctors/, search.json). Bump it whenever
 # the web app starts to need a field; web/scripts/sync-data.mjs refuses to copy an out/ with
 # a lower number over the committed data (a stale out/ used to break /costo silently).
-WEB_SCHEMA = 2
+WEB_SCHEMA = 4
 
 REQUIRED = {
     "doctors": ["doctor_id", "signup_date", "status", "owner_specialist_id",
@@ -208,6 +208,13 @@ def web_view(b: dict, top: int = 12) -> dict:
         "meta": {**{k: b["meta"][k] for k in
                     ["built_at", "source_file", "source_sha256_16", "extract_date"]},
                  "web_schema": WEB_SCHEMA,
+                 # the cuts behind the segments bar and /doctores?risk_band=
+                 "risk_bands": [{"key": k, "label": n, "lo": lo, "hi": hi}
+                                for k, n, lo, hi in kpi.RISK_BANDS],
+                 # search.json "a" is a bitmask over these, in this order
+                 "signal_bits": [k for k, _, _ in kpi.ATTENTION],
+                 # search.json "f" is a bitmask over these
+                 "flag_bits": dayplan.FLAGS,
                  "asof": P.RULES["extract_date"],
                  "queue_capacity": P.RULES["daily_capacity"],
                  "followup_quota": P.RULES["daily_followup_quota"],
@@ -345,17 +352,42 @@ def dossiers(b: dict, doc: pd.DataFrame, copilot: dict, flags: dict) -> dict[str
 
 # Short keys keep search.json under 1 MB; the mapping is SearchRowRaw in web/lib/types.ts.
 SEARCH_KEYS = {"id": "i", "name": "n", "specialty": "s", "city": "c", "owner": "o",
-               "status": "st", "play": "p", "mode": "m", "risk": "r", "flags": "f"}
+               "status": "st", "play": "p", "mode": "m", "risk": "r", "flags": "f",
+               "last_contact": "lc", "followup": "fu", "signals": "a"}
 
 
 def search_rows(doc: pd.DataFrame, copilot: dict, flags: dict) -> list[dict]:
-    """One row per doctor for the command palette and the /doctores list (§5.2)."""
+    """One row per doctor for the command palette and the /doctores list (§5.2).
+
+    Short keys and bitmasks keep the file under 1 MB; web/lib/types.ts searchRow() decodes
+    them with meta.flag_bits and meta.signal_bits."""
+    # Compact, to keep the file under 1 MB: dates as days from the data date (last contact
+    # in the past is positive, a follow-up due later is positive), and the attention
+    # signals as a bitmask in kpi.ATTENTION order (bit 0 = the first signal).
+    att = kpi.attention_masks(doc)
+    bits = {k: 1 << n for n, (k, _, _) in enumerate(kpi.ATTENTION)}
+    signals = {i: sum(b for k, b in bits.items() if att[k].iat[n])
+               for n, i in enumerate(doc.doctor_id)}
+    asof = pd.Timestamp(P.RULES["extract_date"])
+
+    def days(v, sign):
+        if not isinstance(v, str) or not v:
+            return None
+        return int(sign * (pd.Timestamp(v[:10]) - asof).days)
     rows = [{"id": r.doctor_id, "name": r.doctor_name, "specialty": r.specialty, "city": r.city,
              "owner": r.owner_specialist_id, "status": r.status,
              "play": copilot[r.doctor_id]["play"], "mode": copilot[r.doctor_id]["mode"],
-             "risk": _num(r.risk_score), "flags": flags[r.doctor_id]}
+             "risk": _num(r.risk_score),
+             "flags": sum(1 << dayplan.FLAGS.index(f) for f in flags[r.doctor_id]),
+             "last_contact": days(r.last_contact, -1), "followup": days(r.followup_due_at, 1),
+             "signals": signals[r.doctor_id]}
             for _, r in doc.iterrows()]
-    return [{SEARCH_KEYS[k]: v for k, v in x.items()} for x in rows]
+    # the three optional fields are left out when empty: the file is read on every screen
+    # "st" is written only for churned doctors (absent = active).
+    optional = {"last_contact", "followup", "signals"}
+    return [{SEARCH_KEYS[k]: v for k, v in x.items()
+             if not (k in optional and v in (None, 0)) and not (k == "status" and v == "active")}
+            for x in rows]
 
 
 def _dump(path: Path, obj) -> None:

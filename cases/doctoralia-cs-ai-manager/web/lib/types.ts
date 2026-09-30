@@ -9,6 +9,11 @@ export interface Meta {
   queue_capacity?: number
   followup_quota?: number
   plays?: { key: string; mode: "draft" | "brief" | "handoff"; label: I18n }[] // in PLAYS order
+  web_schema?: number
+  /** the segments bar's cuts, [lo, hi); /doctores?risk_band= uses the same */
+  risk_bands?: { key: string; label: string; lo: number; hi: number }[]
+  flag_bits?: string[]
+  signal_bits?: string[]
 }
 
 export interface KpiItem {
@@ -321,28 +326,43 @@ export interface QueueFile {
   items: QueueItem[] // ordered: call, followup, message, handoff, later
 }
 
-// public/search.json (SPEC §5.2), written with short keys to stay under 1 MB
+// public/search.json (SPEC §5.2), written with short keys and bitmasks to stay under 1 MB
 export interface SearchRowRaw {
   i: string // id
   n: string // name
   s: string // specialty
   c: string // city
   o: string // owner
-  st: "active" | "churned" // status
+  st?: "churned" // status; absent = active
   p: string | null // play
   m: string | null // mode
   r: number // risk
-  f: Flag[] // flags
+  f: number // flags, bit n = FLAG_BITS[n]
+  lc?: number // days since the last contact, at the data date; absent = never
+  fu?: number // days until the open follow-up is due (negative = overdue); absent = none
+  a?: number // attention signals, bit n = SIGNAL_BITS[n]; absent = none
 }
 export interface SearchRow {
   id: string; name: string; specialty: string; city: string
   owner: string; status: "active" | "churned"
   play: string | null; mode: string | null; risk: number
   flags: Flag[]
+  lastContact: number | null
+  followup: number | null
+  signals: string[]
 }
+// The bit orders, copied from src/dayplan.py FLAGS and src/kpi.py ATTENTION (overview.json
+// meta.flag_bits / meta.signal_bits); tests/search.test.ts fails if they drift.
+export const FLAG_BITS: Flag[] = [
+  "at_risk", "may_cancel", "discouraged", "hollow", "not_found", "commitment",
+  "followup_due", "calendar_off", "grade_d", "upsell",
+]
+export const SIGNAL_BITS = ["churn_threat", "discouraged", "grade_d", "bottom_q", "calendar_off", "complaint"]
+const bits = <T,>(v: number | undefined, order: readonly T[]): T[] => order.filter((_, n) => ((v ?? 0) >> n) & 1)
 export const searchRow = (x: SearchRowRaw): SearchRow => ({
-  id: x.i, name: x.n, specialty: x.s, city: x.c, owner: x.o, status: x.st,
-  play: x.p, mode: x.m, risk: x.r, flags: x.f,
+  id: x.i, name: x.n, specialty: x.s, city: x.c, owner: x.o, status: x.st ?? "active",
+  play: x.p, mode: x.m, risk: x.r, flags: bits(x.f, FLAG_BITS),
+  lastContact: x.lc ?? null, followup: x.fu ?? null, signals: bits(x.a, SIGNAL_BITS),
 })
 
 export interface TeamRow {

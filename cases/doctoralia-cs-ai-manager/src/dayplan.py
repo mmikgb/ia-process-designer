@@ -121,6 +121,11 @@ def _stale_reason(days: int, window: int) -> dict:
 
 
 # --- flags: the list behind every count ---------------------------------------
+# Every flag flags() can return, in a fixed order (search.json encodes them as bits in it).
+FLAGS = ["at_risk", "may_cancel", "discouraged", "hollow", "not_found", "commitment",
+         "followup_due", "calendar_off", "grade_d", "upsell"]
+
+
 def flags(r, rules: dict, asof: pd.Timestamp) -> list[str]:
     """Per active doctor; churned doctors get [] (kpi.team counts active only)."""
     if r.status != "active":
