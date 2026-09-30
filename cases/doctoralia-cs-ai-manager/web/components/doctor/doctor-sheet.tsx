@@ -120,7 +120,6 @@ export function DoctorSheet({
               </TabsContent>
               <TabsContent value="action" className="flex flex-col gap-4">
                 <ActionPanel doc={doc} onCopied={() => copiedDrafts.add(doc.doctor_id)} />
-                <p className="rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">{t("sheet.writer.soon")}</p>
               </TabsContent>
               <TabsContent value="ai">
                 <p className="rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">{t("sheet.ai.soon")}</p>

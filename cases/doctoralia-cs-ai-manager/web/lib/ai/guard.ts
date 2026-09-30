@@ -38,30 +38,50 @@ export function readings(token: string): { values: number[]; decimals: boolean; 
 }
 
 export function numbersIn(text: string): string[] {
-  return [...text.matchAll(NUM)].map((m) => m[0].trim()).filter((s) => /\d/.test(s))
+  return tokens(text).map((t) => t.token)
+}
+
+function tokens(text: string): { token: string; at: number }[] {
+  return [...text.matchAll(NUM)].filter((m) => /\d/.test(m[0])).map((m) => ({ token: m[0].trim(), at: m.index ?? 0 }))
+}
+
+const MONTH = "ene(?:ro)?|feb(?:rero)?|mar(?:zo)?|abr(?:il)?|may(?:o)?|jun(?:io)?|jul(?:io)?|ago(?:sto)?|sep(?:t(?:iembre)?)?|oct(?:ubre)?|nov(?:iembre)?|dic(?:iembre)?|jan(?:uary)?|february|march|april|june|july|aug(?:ust)?|september|october|november|dec(?:ember)?"
+const WEEKDAY = "lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday"
+const DATE_AFTER = new RegExp(`^\\s*(?:de\\s+)?(?:${MONTH})\\b`, "i")
+const DATE_BEFORE = new RegExp(`(?:\\b(?:${WEEKDAY}|${MONTH})\\.?|\\bel)\\s*$`, "i")
+
+/** Is the number at `at` written as part of a date ("el 7 de septiembre", "lunes 28", "Sep 7")? */
+function inDate(text: string, at: number, token: string): boolean {
+  const before = text.slice(Math.max(0, at - 14), at)
+  const after = text.slice(at + token.length, at + token.length + 16)
+  return DATE_AFTER.test(after) || (DATE_BEFORE.test(before) && DATE_AFTER.test(after)) || new RegExp(`\\b(?:${WEEKDAY}|${MONTH})\\.?\\s*$`, "i").test(before)
+}
+
+export interface Allowed {
+  values: number[]
+  /** a date's day and month: they only justify a number written as a date */
+  dateParts: number[]
 }
 
 /**
  * Every number the output may use: all numbers in the context (walked recursively,
  * including numbers written inside its strings), plus their usual renderings (0.358 →
- * 36%, 35.8%; 12.0 → 12; a date's year, month and day). Counts in the prompt itself
- * are not here on purpose.
+ * 36%, 35.8%; 12.0 → 12), a date's year, and what the specialist typed. A date's day and
+ * month count only where the output writes a date. Counts in the prompt are not here.
  */
-export function allowedNumbers(context: unknown, extraText: string[] = []): number[] {
-  const out = new Set<number>()
-  const add = (n: number) => {
-    if (!Number.isFinite(n)) return
-    out.add(n)
-    if (Math.abs(n) <= 1 && n !== 0) out.add(Math.round(n * 1000) / 10) // share → percent
-    if (Math.abs(n) > 1 && Math.abs(n) < 100) out.add(n / 100) // percent → share
-  }
+export function allowedNumbers(context: unknown, extraText: string[] = []): Allowed {
+  const values = new Set<number>()
+  const dateParts = new Set<number>()
+  const add = (n: number) => Number.isFinite(n) && values.add(n)
   const fromText = (s: string) => {
-    for (const d of s.matchAll(/(\d{4})-(\d{2})-(\d{2})/g)) {
+    const dates = [...s.matchAll(/(\d{4})-(\d{2})-(\d{2})/g)]
+    for (const d of dates) {
       add(Number(d[1]))
-      add(Number(d[2]))
-      add(Number(d[3]))
+      dateParts.add(Number(d[2]))
+      dateParts.add(Number(d[3]))
     }
-    for (const tok of numbersIn(s)) for (const v of readings(tok).values) add(v)
+    const rest = s.replace(/\d{4}-\d{2}-\d{2}(?:[T ][\d:.]+Z?)?/g, " ")
+    for (const tok of numbersIn(rest)) for (const v of readings(tok).values) add(v)
   }
   const walk = (v: unknown) => {
     if (typeof v === "number") add(v)
@@ -71,27 +91,32 @@ export function allowedNumbers(context: unknown, extraText: string[] = []): numb
   }
   walk(context)
   extraText.forEach(fromText)
-  return [...out]
+  return { values: [...values], dateParts: [...dateParts] }
 }
 
-function known(token: string, allowed: number[]): boolean {
+function matches(c: number, a: number, decimals: boolean): boolean {
+  return decimals || !Number.isInteger(c)
+    ? Math.abs(c - a) <= 0.051 // 35.8 vs 35.77
+    : Math.round(a) === c || Math.abs(c - a) < 1e-9 // "36" may round 35.8
+}
+
+function known(token: string, allowed: Allowed, date: boolean): boolean {
   const r = readings(token)
   return r.values.some((v) => {
+    // "36%" may be the share 0.358 or the value 36; "35.8" the share 0.358 as a percent
     const candidates = r.percent ? [v, v / 100] : [v]
-    return candidates.some((c) =>
-      allowed.some((a) =>
-        r.decimals || !Number.isInteger(c)
-          ? Math.abs(c - a) <= 0.051 // 35.8 vs 35.77
-          : Math.round(a) === c || Math.abs(c - a) < 1e-9, // "36" may round 35.8
-      ),
-    )
+    const hit = candidates.some((c) => allowed.values.some((a) => matches(c, a, r.decimals)))
+    const shareAsPercent = !r.percent && r.decimals && allowed.values.some((a) => Math.abs(a) <= 1 && matches(v, a * 100, true))
+    return hit || shareAsPercent || (date && Number.isInteger(v) && allowed.dateParts.includes(v))
   })
 }
 
 export function guard(output: string, context: unknown, extraText: string[] = []): GuardFlags {
   const allowed = allowedNumbers(context, extraText)
-  const unverified = [...new Set(numbersIn(output).filter((tok) => !known(tok, allowed)))]
+  const bad = tokens(output)
+    .filter(({ token, at }) => !known(token, allowed, inDate(output, at, token)))
+    .map((t) => t.token)
   const text = fold(output)
   const banned = BANNED.filter((p) => text.includes(fold(p)))
-  return { unverified_numbers: unverified, banned_phrases: [...new Set(banned.map(fold))] }
+  return { unverified_numbers: [...new Set(bad)], banned_phrases: [...new Set(banned.map(fold))] }
 }

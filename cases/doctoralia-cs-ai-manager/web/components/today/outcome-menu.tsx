@@ -31,6 +31,8 @@ export const NA_REASONS: Key[] = ["outcome.na.resolved", "outcome.na.not_mine", 
 
 // Drafts copied from a row this session: the outcome logged next carries draft_copied.
 export const copiedDrafts = new Set<string>()
+// AI features used on a doctor this session: the outcome logged next carries ai_used.
+export const aiUsed = new Map<string, Set<string>>()
 
 type Target = { doctor_id: string; doctor_name: string; play: string | null; mode?: string | null }
 
@@ -38,8 +40,14 @@ type Target = { doctor_id: string; doctor_name: string; play: string | null; mod
 export function useLogOutcome(day: Pick<Day, "log">) {
   const { t, day: fmtDay } = useT()
   return async (x: Target, outcome: Outcome, extra: LogExtra = {}) => {
-    const e = await day.log(x, outcome, { draft_copied: copiedDrafts.has(x.doctor_id), ...extra })
+    const used = [...(aiUsed.get(x.doctor_id) ?? [])]
+    const e = await day.log(x, outcome, {
+      draft_copied: copiedDrafts.has(x.doctor_id),
+      ...(used.length ? { ai_used: used } : {}),
+      ...extra,
+    })
     copiedDrafts.delete(x.doctor_id)
+    aiUsed.delete(x.doctor_id)
     if (outcome === "skipped") return e
     toast(t("outcome.logged", { outcome: t(OUTCOME_LABEL[outcome]), name: x.doctor_name }), {
       description: e.next_due ? t("outcome.returns", { date: fmtDay(e.next_due) }) : undefined,

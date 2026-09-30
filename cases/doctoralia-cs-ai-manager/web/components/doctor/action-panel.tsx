@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Check, Copy, RotateCcw, TriangleAlert } from "lucide-react"
+import { Writer } from "@/components/ai/writer"
 import { Button } from "@/components/ui/button"
 import { useT } from "@/lib/i18n"
 import type { Dossier } from "@/lib/types"
@@ -81,6 +82,15 @@ export function ActionPanel({
             )}
           </div>
           {doc.copilot.i18n.why && <p className="text-xs text-pretty text-muted-foreground">{tx(doc.copilot.i18n.why)}</p>}
+          <Writer
+            doctorId={doc.doctor_id}
+            mode="draft"
+            base={original}
+            onUse={(v) => {
+              setText(v)
+              setCopied(false)
+            }}
+          />
         </div>
       ) : doc.copilot.i18n.instead ? (
         <div className="flex flex-col gap-2">
@@ -91,6 +101,9 @@ export function ActionPanel({
             {tx(doc.copilot.i18n.instead)}
           </pre>
           {doc.copilot.i18n.why && <p className="text-xs text-pretty text-muted-foreground">{tx(doc.copilot.i18n.why)}</p>}
+          {(doc.copilot.mode === "brief" || handoff) && (
+            <Writer doctorId={doc.doctor_id} mode={doc.copilot.mode} base={doc.copilot.i18n.instead.es} />
+          )}
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">{t("focus.nodraft")}</p>

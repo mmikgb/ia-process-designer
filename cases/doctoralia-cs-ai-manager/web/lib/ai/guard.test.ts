@@ -36,3 +36,15 @@ test("banned phrases, accent-insensitive", () => {
   const g = guard("Le garantizo resultados y la configuración es gratis; más pacientes seguro.", ctx)
   assert.deepEqual(g.banned_phrases.sort(), ["garantizo", "gratis", "mas pacientes seguro"])
 })
+
+test("a date's day only justifies a date, not a count", () => {
+  const ctx2 = { followup: { due_at: "2026-09-07" }, slots: 18 }
+  assert.deepEqual(guard("Lo llamo el 7 de septiembre; tiene 18 horarios.", ctx2).unverified_numbers, [])
+  assert.deepEqual(guard("Con esto recibiría 7 citas más al mes.", ctx2).unverified_numbers, ["7"])
+  assert.deepEqual(guard("¿Le funciona el lunes 28 de septiembre?", { d: "2026-09-28" }).unverified_numbers, [])
+})
+
+test("a share becomes a percent only when written as one", () => {
+  assert.deepEqual(guard("El 36% se va.", { churn: 0.358 }).unverified_numbers, [])
+  assert.deepEqual(guard("Recibe 36 citas.", { churn: 0.358 }).unverified_numbers, ["36"])
+})
