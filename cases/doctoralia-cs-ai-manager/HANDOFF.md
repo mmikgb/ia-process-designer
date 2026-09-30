@@ -547,3 +547,22 @@ first. Order to use: `pipeline.py` → `bundle.py` → `analysis.py`.
 - Checks run: `pytest tests/` 65 passed; `pnpm test` 14 passed; `pnpm typecheck`; `pnpm build`;
   `pnpm e2e` 5 passed (G2: 2 clicks / 841 ms, 3 clicks / 836 ms). `web/public` is 25 MB.
 - **Not tested yet: a real model call.** Everything above ran in mock mode or with no key.
+
+### The Phase 4 pause: first real calls (2026-09-30, on Miguel's Mac)
+
+- Key in `web/.env.local` (git-ignored; written with `read -s`, never pasted anywhere). Models as
+  proposed (Haiku 4.5 fast, Sonnet 5.5 deep with server-side fallbacks); budget left at the
+  demo's $25. Miguel ran the app and the Ask drawer answered with the real model: "quedó
+  perfecto".
+- **Two bugs found on the way, both fixed with a test that reproduces them:**
+  1. Recent Chrome returns a Promise from `scrollIntoView`. The drawer's effect was written as an
+     expression and returned it; React called it as a cleanup on the next update and the page
+     died ("i is not a function" / "This page couldn't load"). The container's Chromium returns
+     `undefined`, so nothing here saw it. All effects now use block bodies; `e2e/ask.spec.ts`
+     patches `scrollIntoView` to return a Promise and asks twice.
+  2. A stale `out/` (from a bundle.py before T4.8) was copied over the branch's
+     `web/data/overview.json` at `prebuild`, and `/costo` failed to prerender. `bundle.py` now
+     writes `meta.web_schema` (bump it whenever the web needs a new field) and `sync-data.mjs`
+     keeps the committed data when `out/` has a lower number, with the command to rebuild.
+- Also seen on the Mac: a leftover `.next/dev` from an old dev server breaks `next build`'s type
+  check (`Cannot find module '../../../app/cost/page.js'`); `rm -rf .next` fixes it.
