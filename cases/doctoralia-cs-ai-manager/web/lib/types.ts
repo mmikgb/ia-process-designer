@@ -1,3 +1,5 @@
+import type { I18n, Text } from "./tx"
+
 export interface Meta {
   built_at: string
   source_file: string
@@ -7,14 +9,16 @@ export interface Meta {
 
 export interface KpiItem {
   key: string
-  label: string
-  value: number
+  label: Text
+  value: number | null
   prev: number | null
   delta_pct: number | null
   fmt: string
   good: "up" | "down"
   spark: number[]
-  note: string
+  note: Text
+  n: number | null // denominator of a rate; null for counts
+  suppressed?: I18n // present when value and delta are withheld (n < RULES.min_n_rate)
 }
 
 export interface AttentionItem {

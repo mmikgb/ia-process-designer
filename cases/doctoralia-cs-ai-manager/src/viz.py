@@ -7,6 +7,7 @@ skill). Two categorical hues only — a third series folds into "other".
 """
 from __future__ import annotations
 import html
+from i18n import en
 import plotly.graph_objects as go
 
 LIGHT = {"bar": "#0d8159", "alt": "#5b5bd6", "ink": "#14211c", "mut": "#5f6f68",
@@ -173,10 +174,10 @@ def kpi_card(k: dict, dark=False) -> str:
                 f'{arrow} {abs(d):.0%}</span>')
     sp = spark_svg(k["spark"], p["bar"]) if k.get("spark") else ""
     return f"""<div style="border:1px solid {p['grid']};border-radius:12px;padding:14px 16px;height:100%">
-  <div style="color:{p['mut']};font-size:12.5px;line-height:1.3;min-height:32px">{html.escape(k['label'])}</div>
+  <div style="color:{p['mut']};font-size:12.5px;line-height:1.3;min-height:32px">{html.escape(en(k['label']))}</div>
   <div style="display:flex;align-items:baseline;gap:8px;margin:6px 0 2px">
     <div style="font-size:27px;font-weight:650;color:{p['ink']};letter-spacing:-.02em">{val}</div>{chip}
   </div>
   <div style="margin:4px 0 2px">{sp}</div>
-  <div style="color:{p['mut']};font-size:11.5px;line-height:1.35">{html.escape(k.get('note',''))}</div>
+  <div style="color:{p['mut']};font-size:11.5px;line-height:1.35">{html.escape(en(k.get('suppressed') or k.get('note')) or '')}</div>
 </div>"""

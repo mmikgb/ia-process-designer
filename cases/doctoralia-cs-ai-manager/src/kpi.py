@@ -9,20 +9,75 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from i18n import L, pct
+
 WINDOW = 30   # days for "current"; the same length immediately before is "previous"
+BUCKETS = ["<30m", "30-60m", "60-120m", "120m+"]
 
 
-def _kpi(key, label, value, prev, fmt="{:.0f}", good="up", spark=None, note=""):
+def _kpi(key, label, value, prev, fmt="{:.0f}", good="up", spark=None, note="",
+         n=None, prev_n=None, rate=False):
+    """`n` is the denominator of a rate (None for counts). A rate on fewer than
+    RULES["min_n_rate"] cases is withheld, and so is a delta when either window is short."""
+    from pipeline import RULES
+    min_n = RULES["min_n_rate"]
+    suppressed = None
+    if rate and n is not None and n < min_n:
+        value, prev = None, None
+        suppressed = L(f"Only {n} cases: too few for a rate",
+                       f"Solo {n} casos: muy pocos para un porcentaje")
     d = None if (prev in (None, 0) or value is None) else (value - prev) / abs(prev)
-    return {"key": key, "label": label, "value": None if value is None else round(float(value), 4),
-            "prev": None if prev is None else round(float(prev), 4),
-            "delta_pct": None if d is None else round(float(d), 4),
-            "fmt": fmt, "good": good, "spark": spark or [], "note": note}
+    if rate and prev_n is not None and prev_n < min_n:
+        d = None
+    out = {"key": key, "label": label, "value": None if value is None else round(float(value), 4),
+           "prev": None if prev is None else round(float(prev), 4),
+           "delta_pct": None if d is None else round(float(d), 4),
+           "fmt": fmt, "good": good, "spark": spark or [], "note": note,
+           "n": None if n is None else int(n)}
+    if suppressed:
+        out["suppressed"] = suppressed
+    return out
 
 
-def build(t, doc, esc, ser, asof: pd.Timestamp, window: int = WINDOW) -> dict:
-    from pipeline import RULES  # labels quote the thresholds in force, not the ones at writing time
+def conversion_buckets(esc: pd.DataFrame, min_n: int) -> list[dict]:
+    """Conversion by pickup bucket, people only. The one source for "53% when fast"."""
+    e = esc[esc.is_person] if "is_person" in esc else esc
+    out = []
+    for bk in BUCKETS:
+        m = e[e.pickup_bucket == bk]
+        if len(m) >= min_n:
+            out.append({"bucket": bk, "n": int(len(m)), "converted": round(float(m.converted.mean()), 4)})
+    return out
+
+
+def context(doc: pd.DataFrame, esc: pd.DataFrame) -> dict:
+    """Portfolio-wide figures the notes quote. Computed once on the whole book and
+    passed to every scope, so the note reads the same on every screen."""
+    from pipeline import RULES
+    a = doc[doc.onboarding_grade == "A"]
+    return {"buckets": conversion_buckets(esc, RULES["min_n_rate"]),
+            "churn_grade_a": float((a.status == "churned").mean()) if len(a) else None}
+
+
+def build(t, doc, esc, ser, asof: pd.Timestamp, window: int = WINDOW, ctx: dict | None = None) -> dict:
+    from pipeline import RULES, LIFT, BASELINE_CHURN  # labels quote the rules in force
     target, slots = RULES["escalation_pickup_target_min"], RULES["calendar_healthy_slots"]
+    ctx = ctx or context(doc, esc)
+    bk = {b["bucket"]: b["converted"] for b in ctx["buckets"]}
+    if "<30m" in bk and "120m+" in bk:
+        conv_note = L(f"{pct(bk['<30m'])} when answered inside 30 min, {pct(bk['120m+'])} after two hours",
+                      f"{pct(bk['<30m'])} si se atiende en menos de 30 min, {pct(bk['120m+'])} "
+                      "después de dos horas")
+    else:
+        conv_note = L("conversion by pickup time is on the team screen",
+                      "la conversión por tiempo de atención está en Mi equipo")
+    grade_a = ctx["churn_grade_a"]
+    d_note = (L(f"{pct(LIFT['grade_D'][1])} of grade-D doctors churn, against {pct(grade_a)} of A",
+                f"el {pct(LIFT['grade_D'][1])} de los doctores grado D se van, contra "
+                f"{pct(grade_a)} de los A")
+              if grade_a is not None else
+              L(f"{pct(LIFT['grade_D'][1])} of grade-D doctors churn",
+                f"el {pct(LIFT['grade_D'][1])} de los doctores grado D se van"))
     cur_a, cur_b = asof - pd.Timedelta(days=window), asof
     pre_a, pre_b = asof - pd.Timedelta(days=2 * window), cur_a
     active = doc[doc.status == "active"]
@@ -48,33 +103,49 @@ def build(t, doc, esc, ser, asof: pd.Timestamp, window: int = WINDOW) -> dict:
     sp_sla = [round(float(x), 4) for x in w_esc.within_target_rate.tail(12)]
     sp_conv = [round(float(x), 4) for x in w_esc.conversion.tail(12)]
 
+    share = pct(float((active.risk_score >= .5).mean())) if len(active) else "0%"
     kpis = [
-        _kpi("at_risk", "Doctors at risk", int((active.risk_score >= .5).sum()),
-             None, "{:,.0f}", "down",
-             note=f"{(active.risk_score >= .5).mean():.0%} of the active portfolio"),
-        _kpi("may_cancel", "Said they may cancel", int(active.sig_churn_threat.sum()),
-             None, "{:,.0f}", "down", note="36% of these churn, against 6.6% baseline"),
-        _kpi("sla", f"Escalations answered in {target} min",
+        _kpi("at_risk", L("Doctors at risk", "Doctores en riesgo"),
+             int((active.risk_score >= .5).sum()), None, "{:,.0f}", "down",
+             note=L(f"{share} of the active portfolio", f"{share} de la cartera activa")),
+        _kpi("may_cancel", L("Said they may cancel", "Dijeron que cancelarían"),
+             int(active.sig_churn_threat.sum()), None, "{:,.0f}", "down",
+             note=L(f"{pct(LIFT['churn_threat'][1])} of these churn, against "
+                    f"{pct(BASELINE_CHURN, 1)} baseline",
+                    f"el {pct(LIFT['churn_threat'][1])} de estos se van, contra "
+                    f"{pct(BASELINE_CHURN, 1)} de base")),
+        _kpi("sla", L(f"Escalations answered in {target} min",
+                      f"Escalaciones atendidas en {target} min"),
              e_cur.within_target.mean() if len(e_cur) else None,
              e_pre.within_target.mean() if len(e_pre) else None,
-             "{:.0%}", "up", sp_sla, note=f"{len(e_cur)} escalations in the last {window} days"),
-        _kpi("conversion", "Escalation conversion",
+             "{:.0%}", "up", sp_sla,
+             note=L(f"{len(e_cur)} escalations in the last {window} days",
+                    f"{len(e_cur)} escalaciones en los últimos {window} días"),
+             n=len(e_cur), prev_n=len(e_pre), rate=True),
+        _kpi("conversion", L("Escalation conversion", "Conversión de escalaciones"),
              e_cur.converted.mean() if len(e_cur) else None,
              e_pre.converted.mean() if len(e_pre) else None,
-             "{:.0%}", "up", sp_conv,
-             note="54% when answered inside 30 min, 14% after two hours"),
-        _kpi("onb_score", "Average onboarding score",
+             "{:.0%}", "up", sp_conv, note=conv_note,
+             n=len(e_cur), prev_n=len(e_pre), rate=True),
+        _kpi("onb_score", L("Average onboarding score", "Calificación promedio de onboarding"),
              o_cur.score.mean() if len(o_cur) else None,
              o_pre.score.mean() if len(o_pre) else None,
-             "{:.1f}", "up", sp_score, note=f"{len(o_cur)} onboardings closed"),
-        _kpi("grade_d", "Grade-D rate",
+             "{:.1f}", "up", sp_score,
+             note=L(f"{len(o_cur)} onboardings closed", f"{len(o_cur)} onboardings cerrados"),
+             n=len(o_cur)),
+        _kpi("grade_d", L("Grade-D rate", "Tasa de grado D"),
              (o_cur.grade == "D").mean() if len(o_cur) else None,
              (o_pre.grade == "D").mean() if len(o_pre) else None,
-             "{:.1%}", "down", sp_d, note="17% of grade-D doctors churn, against 2% of A"),
-        _kpi("hollow", "Agenda too thin", int(active.calendar_hollow.sum()), None,
-             "{:,.0f}", "down", note=f"calendar on, under {slots} slots published"),
-        _kpi("not_found", "Not being found", int(active.demand_constrained.sum()), None,
-             "{:,.0f}", "down", note="plenty of slots, still below their peer median"),
+             "{:.1%}", "down", sp_d, note=d_note,
+             n=len(o_cur), prev_n=len(o_pre), rate=True),
+        _kpi("hollow", L("Agenda too thin", "Agenda muy delgada"),
+             int(active.calendar_hollow.sum()), None, "{:,.0f}", "down",
+             note=L(f"calendar on, under {slots} slots published",
+                    f"agenda encendida, menos de {slots} horarios publicados")),
+        _kpi("not_found", L("Not being found", "No lo encuentran"),
+             int(active.demand_constrained.sum()), None, "{:,.0f}", "down",
+             note=L("plenty of slots, still below their peer median",
+                    "horarios de sobra y aún debajo de la mediana de sus pares")),
     ]
 
     # ---- attention list: the signals, sized, ranked by measured churn lift
@@ -147,7 +218,8 @@ def scopes(t, doc, esc, asof: pd.Timestamp) -> dict:
     for sid in farm.specialist_id:
         groups[sid] = (set(doc[doc.owner_specialist_id == sid].doctor_id), 1)
 
-    base = build(t, doc, esc, series.build(t), asof)
+    ctx = context(doc, esc)
+    base = build(t, doc, esc, series.build(t), asof, ctx=ctx)
     lift = {a["key"]: (a["churn"], a["lift"]) for a in base["attention"]}
 
     out = {}
@@ -156,7 +228,7 @@ def scopes(t, doc, esc, asof: pd.Timestamp) -> dict:
         ser = series.build(ts)
         per = {}
         for w in PERIODS:
-            k = build(ts, d, e, ser, asof, window=w)
+            k = build(ts, d, e, ser, asof, window=w, ctx=ctx)
             for a in k["attention"]:
                 a["churn"], a["lift"] = lift.get(a["key"], (a["churn"], a["lift"]))
             k["attention"].sort(key=lambda x: -x["lift"])
@@ -168,15 +240,13 @@ def scopes(t, doc, esc, asof: pd.Timestamp) -> dict:
 
 # ---- the manager's team view ----------------------------------------------
 
-MIN_ESC = 10   # below this, a specialist gets a count and no percentage
-
-
 def team(t, doc, esc, asof: pd.Timestamp) -> dict:
     """One row per farming specialist: the work in their book and how their
     escalations were handled. Deliberately no conversion ranking: inside the
     30-minute bucket everyone converts about the same, so a raw conversion
     column measures the queue, not the person."""
     from pipeline import RULES
+    min_n = RULES["min_n_rate"]   # below this, a specialist gets a count and no percentage
     sp = t["specialists"].merge(t["teams"], on="team_id")
     farm = sp[sp.role == "Farming Specialist"].sort_values("specialist_id")
     active = doc[doc.status == "active"]
@@ -188,7 +258,7 @@ def team(t, doc, esc, asof: pd.Timestamp) -> dict:
     for _, s in farm.iterrows():
         p = active[active.owner_specialist_id == s.specialist_id]
         x = e[e.specialist_id == s.specialist_id]
-        enough = len(x) >= MIN_ESC
+        enough = len(x) >= min_n
         wk = x.groupby("week").minutes_to_pickup.median()
         rows.append({
             "id": s.specialist_id, "name": s.specialist_name, "team": s.team_name,
@@ -209,11 +279,7 @@ def team(t, doc, esc, asof: pd.Timestamp) -> dict:
             "pickup_weeks": [None if w not in wk.index else round(float(wk[w]), 1) for w in weeks],
         })
 
-    buckets = []
-    for bk in ["<30m", "30-60m", "60-120m", "120m+"]:
-        m = e[e.pickup_bucket == bk]
-        if len(m) >= MIN_ESC:
-            buckets.append({"bucket": bk, "n": int(len(m)), "converted": round(float(m.converted.mean()), 4)})
+    buckets = conversion_buckets(e, min_n)
 
     nobody = esc[~esc.is_person] if "is_person" in esc else esc.iloc[0:0]
     return {
@@ -221,7 +287,7 @@ def team(t, doc, esc, asof: pd.Timestamp) -> dict:
         "weeks": [str(pd.Timestamp(w).date()) for w in weeks],
         "buckets": buckets,
         "target_min": RULES["escalation_pickup_target_min"],
-        "min_escalations": MIN_ESC,
+        "min_escalations": min_n,
         "unowned": {"n": int(len(nobody)),
                     "by_queue": {str(k): int(v) for k, v in nobody.specialist_id.value_counts().items()}},
     }

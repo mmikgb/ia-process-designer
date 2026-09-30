@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { formatDeltaPct, isGoodDelta, pyFormat } from "@/lib/format"
 import type { KpiItem } from "@/lib/types"
+import { tx } from "@/lib/tx"
 
 export function KpiGrid({ kpis }: { kpis: KpiItem[] }) {
   return (
@@ -27,12 +28,12 @@ function KpiCard({ kpi }: { kpi: KpiItem }) {
   return (
     <Card className="rounded-xl border-border">
       <CardHeader className="gap-1 pb-0">
-        <span className="text-xs font-medium text-muted-foreground">{kpi.label}</span>
+        <span className="text-xs font-medium text-muted-foreground">{tx(kpi.label)}</span>
       </CardHeader>
       <CardContent className="flex flex-col gap-2 pt-2">
         <div className="flex items-center justify-between gap-2">
           <span className="font-mono text-3xl font-semibold tabular-nums text-foreground">
-            {pyFormat(kpi.value, kpi.fmt)}
+            {kpi.value == null ? "\u2014" : pyFormat(kpi.value, kpi.fmt)}
           </span>
           {hasDelta && (
             <Badge
@@ -89,7 +90,7 @@ function KpiCard({ kpi }: { kpi: KpiItem }) {
           </div>
         )}
 
-        <p className="text-xs text-muted-foreground text-pretty">{kpi.note}</p>
+        <p className="text-xs text-muted-foreground text-pretty">{tx(kpi.suppressed ?? kpi.note)}</p>
       </CardContent>
     </Card>
   )

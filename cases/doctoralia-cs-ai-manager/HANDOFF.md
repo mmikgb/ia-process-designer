@@ -371,3 +371,22 @@ first. Order to use: `pipeline.py` → `bundle.py` → `analysis.py`.
   hollow, not_found, open_commitments, may_cancel and at_risk (tested).
 - `tests/test_dayplan.py`: 10 tests, including every check the spec lists; the PLAYS reorder
   test uses unlimited capacity so the reorder is visible in the full candidate list.
+
+### T1.6 KPIs: sample sizes and honest notes
+
+- `_kpi()` carries `n`; for `sla`, `conversion`, `grade_d` a value on fewer than
+  `RULES["min_n_rate"]` (10, moved from `kpi.MIN_ESC`) is withheld with `suppressed: L(...)`,
+  and the delta is withheld when either window is short. S10's "100% ▲+250% on 5
+  escalations" is now "Solo 5 casos: muy pocos para un porcentaje". `onb_score` carries `n` but
+  is a mean, so it is not suppressed.
+- Notes are computed: conversion quotes the team screen's buckets (53% inside 30 min, 14% after
+  two hours; the old hard-coded "54%" is gone); may-cancel and grade-D quote `LIFT`,
+  `BASELINE_CHURN` and the grade-A churn rate. Portfolio-wide figures are computed once
+  (`kpi.context`) and passed to every scope, so the notes read the same everywhere.
+- Labels and notes are `L(...)`. Attention labels, segment names and `health_note` stay
+  strings until T5.6.
+- To keep the running app unchanged: `web/lib/tx.ts` (minimal `tx()`, English until T2.3),
+  `KpiItem` types updated, the KPI card shows "—" and the suppression text when a rate is
+  withheld; Streamlit's `viz.kpi_card` reads the English side.
+- `tests/test_kpi.py`: 4 tests (no rate below n=10 in any scope or period; the Overview note
+  and the team screen agree on conversion; bilingual labels quote `RULES`).
