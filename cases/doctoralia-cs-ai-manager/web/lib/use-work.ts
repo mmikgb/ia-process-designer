@@ -3,7 +3,7 @@
 // The outcome log in the browser: one store per owner, shared by Hoy, focus mode
 // and the doctor sheet. Server first (/api/work → out/work_log.jsonl); when the API
 // is not there (a static deploy) it falls back to localStorage and says so.
-import { useCallback, useEffect, useSyncExternalStore } from "react"
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react"
 import { fold, newId, type NewEvent, type WorkEvent } from "@/lib/work"
 
 interface Store {
@@ -114,4 +114,31 @@ export function useWork(owner: string | null) {
 /** For a sheet opened on any doctor: record against that doctor's owner. */
 export function recordFor(owner: string, e: NewEvent) {
   return record(owner, e)
+}
+
+/** Every owner's events, for the team view (read-only). Falls back to this browser's copies. */
+export function useAllWork(): { events: WorkEvent[]; local: boolean; loaded: boolean } {
+  const [s, set] = useState<{ events: WorkEvent[]; local: boolean; loaded: boolean }>({ events: [], local: false, loaded: false })
+  useEffect(() => {
+    let live = true
+    fetch("/api/work", { cache: "no-store" })
+      .then((r) => (r.ok ? (r.json() as Promise<{ events: WorkEvent[] }>) : Promise.reject(new Error(String(r.status)))))
+      .then((d) => live && set({ events: d.events, local: false, loaded: true }))
+      .catch(() => {
+        const events: WorkEvent[] = []
+        try {
+          for (let i = 0; i < window.localStorage.length; i++) {
+            const k = window.localStorage.key(i)
+            if (k?.startsWith("cs:work:")) events.push(...readLocal(k.slice(8)))
+          }
+        } catch {
+          // no storage either: an empty log
+        }
+        if (live) set({ events, local: true, loaded: true })
+      })
+    return () => {
+      live = false
+    }
+  }, [])
+  return s
 }

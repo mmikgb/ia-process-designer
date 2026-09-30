@@ -182,7 +182,7 @@ WATCH_FIELDS = ["doctor_id", "doctor_name", "specialty", "city", "owner_speciali
                 "top_signal", "days_elapsed", "lead_median", "days_of_lead_left", "overdue",
                 "tier", "risk_score", "bookings_avg", "median_specialty_city", "signal_at", "quote"]
 WEB_RULES = ["calendar_healthy_slots", "escalation_pickup_target_min", "peer_low_percentile",
-             "stale_contact_days", "extract_date"]
+             "stale_contact_days", "extract_date", "min_n_rate", "followup_stale_days"]
 
 
 def web_view(b: dict, top: int = 12) -> dict:

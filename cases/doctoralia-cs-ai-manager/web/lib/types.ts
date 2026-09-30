@@ -126,6 +126,8 @@ export interface Rules {
   peer_low_percentile: number
   stale_contact_days: number
   extract_date: string
+  min_n_rate?: number // below this many cases a rate is withheld; show the count
+  followup_stale_days?: number
 }
 
 export interface SpcPoint {

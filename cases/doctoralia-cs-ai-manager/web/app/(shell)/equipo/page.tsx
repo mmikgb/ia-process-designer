@@ -10,7 +10,7 @@ export const metadata = { title: "Mi equipo · CS Control Room" }
 export default function Page() {
   return (
     <Framed title="nav.team" subtitle="team.subtitle">
-      <TeamScreen data={data} />
+      <TeamScreen team={data.team} teams={data.teams} rules={data.rules} />
     </Framed>
   )
 }
