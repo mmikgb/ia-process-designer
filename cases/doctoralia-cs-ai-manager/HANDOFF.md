@@ -501,3 +501,49 @@ first. Order to use: `pipeline.py` → `bundle.py` → `analysis.py`.
 - Not done here: the bell and the Resumen worklist still read the file, not the log (the bell
   counts the default cut); Resumen, Mi equipo, Pulse, Control, Costo inner text is still
   English (phase 5).
+
+### Phase 4: the AI layer (all of it runs with no key; tested with `CS_AI_MOCK=1` and with no key)
+
+- **T4.6 Guard** (`web/lib/ai/guard.ts`, `guard.test.ts`): every number in an output must be in
+  the context (or its usual renderings: 0.358 → 36%, 35.8%; 12.0 → 12). A date's day and month
+  justify a number only when it is written as a date, and a share becomes a percent only with `%`
+  (both found by a test: "7 citas más" passed because a follow-up was due on the 7th). Banned
+  phrases ("garantizado", "sin costo"…) are flagged. Tasks can add their own flags (the analysis
+  flags evidence dates not in the record).
+- **T4.1 Gateway** (`web/lib/ai/gateway.ts`), the only web module that calls Anthropic. It never
+  throws: no key, switched off, budget, 20 calls/min per person, refusal, bad JSON or a network
+  error each return the task's deterministic fallback with the reason. One ledger row per call
+  (`out/llm_ledger_web.jsonl`), which `src/llm.py` adds to its own monthly spend, so the budget
+  is shared. Response cache in `out/ai_cache` (key: task, input, locale, bundle hash, prompt
+  version); mock answers are never cached. Prompt caching on the system prompt and the context
+  block. Fast tier `claude-haiku-4-5-20251001`; deep tier `claude-sonnet-5-5` with
+  **server-side fallbacks** (`betas: ["server-side-fallback-2026-07-01"]`, `fallbacks: "default"`,
+  `output_config.effort`), and JSON tasks use structured outputs (`output_config.format`).
+- **T4.2 Analizar doctor** (deep, JSON): the doctor sheet's "Análisis IA" tab. Every claim
+  carries its evidence and date; "Ver contexto" shows exactly what the model saw.
+- **T4.3 Message writer** (fast, guard = reject): channel and tone, word diff, and a draft with
+  a number that is not in the record goes out as the original.
+- **T4.4 Briefing** (fast): the specialist's morning on Hoy and the manager's week on Resumen,
+  gated on identity so it does not fire for "nobody".
+- **T4.5 Explícame** (fast): an icon on every KPI card, control chart, team row and attention
+  signal; a popover streams at most three sentences from that block only. The fallback is the
+  block's label and note, n, and the chart verdict (or "no control chart: read it as a trend").
+- **T4.7 Ask drawer** (deep, tools): ⌘J or the sidebar card. Tools `search_doctors` (plus a
+  `name` filter, so "Resume lo que pasó con el Dr. Gamboa" can find him), `get_doctor`,
+  `get_kpis`, `get_queue`, all limited to the viewer's scope; 4 tool rounds, then a fifth call
+  with `tool_choice: none` forces an answer. The answer is guarded against the screen context
+  plus every tool result. **Deviation:** the action buttons are derived on the server from the
+  tools the model used (a search → "Ver los N · filtro", a doctor lookup → "Abrir …", the queue
+  on Hoy → "Empezar el día"), not written by the model: a button can never point at a list the
+  model did not actually count. `open_list` goes to `/doctores?owner=…&flag=…`, which honours
+  those filters from T5.1. With no key the drawer says why it is off and offers the screen's
+  lists.
+- **T4.8 Costo IA**: live panel from `/api/ai/status` (state, models, spend vs budget, calls and
+  fallbacks by task and by specialist, cache hit rate, kill switch, budget input). The daily-use
+  estimate is computed once in `src/llm.py usage_estimate()` from the spec's table and `PRICES`
+  and bundled: **$3.60 per specialist a month, $50.35 for 14**, before prompt-cache savings.
+  Recommended budget $75 (the demo's settings default stays $25). README updated. The screen is
+  bilingual now (it was one of the English ones listed under phase 3).
+- Checks run: `pytest tests/` 65 passed; `pnpm test` 14 passed; `pnpm typecheck`; `pnpm build`;
+  `pnpm e2e` 5 passed (G2: 2 clicks / 841 ms, 3 clicks / 836 ms). `web/public` is 25 MB.
+- **Not tested yet: a real model call.** Everything above ran in mock mode or with no key.
