@@ -566,3 +566,47 @@ first. Order to use: `pipeline.py` → `bundle.py` → `analysis.py`.
      keeps the committed data when `out/` has a lower number, with the command to rebuild.
 - Also seen on the Mac: a leftover `.next/dev` from an old dev server breaks `next build`'s type
   check (`Cannot find module '../../../app/cost/page.js'`); `rm -rf .next` fixes it.
+
+### Phase 5: manager screens, lists that match their counts, both languages
+
+- **T5.1 `/doctores`**: the whole book in scope from `search.json`, filters in the URL (`flag`,
+  `signal`, `play`, `owner`, `team`, `risk_band`, `risk_min`, `specialty`, `city`, `q`, `status`
+  (active by default), `scope=all`), removable chips, row → doctor sheet, CSV of the filtered
+  rows. A specialist always sees their own book; a manager sees the URL's owner or team, else the
+  switcher's scope.
+  - `search.json` gains last contact, follow-up and attention signals. To stay under its 1 MB
+    gate, dates are days from the data date and flags and signals are bitmasks (orders in
+    `meta.flag_bits` / `meta.signal_bits`, checked by `tests/search.test.ts`); `st` is only
+    written for churned doctors. **875 KB.** The T1.7 test was updated for the new encoding; its
+    assertions (same keys, flags equal to the dossier's) are unchanged.
+  - The attention signals and the risk bands are defined once in `kpi.py` (`ATTENTION`,
+    `RISK_BANDS`) and shared by the attention list, the segments bar and the list filters.
+  - **Deviation:** attention signals link as `/doctores?signal=…`, not `?flag=…`: they are not
+    flags (e.g. "complained" is not a flag), and a flag with a different definition would not
+    match the count.
+- **T5.2 (G4)**: every count links through `lib/lists.ts`: My team's five counts, the overview KPI
+  cards that are counts (at risk, may cancel, agenda too thin, not being found; the grade-D card
+  is a rate and does not link), the attention signals and the risk bands. `e2e/counts.spec.ts`
+  clicks every team count for S01 and S07 and the overview's counts; each list has that many
+  rows. Two bugs found by it and fixed: the overview drew the whole portfolio for a moment before
+  the identity loaded (a click then opened the wrong list), and a link for "all" carried no scope,
+  so `/doctores` fell back to the viewer's own.
+- **T5.3 `/resumen`**: new style, bilingual; the specialist toggle and **the old worklist (with
+  its snooze store) are removed**: `/doctores` and the linked counts replace it.
+- **T5.4 My team**: a list of people with every count a link; follow-through from the outcome log
+  (`followThrough()` in `lib/work.ts`, node tests): outcomes today and this week, follow-ups
+  overdue (a return the log scheduled, or a note's follow-up up to `followup_stale_days` late
+  that the log has not touched), drafts sent as written vs edited (a count below `min_n_rate`).
+  Both rules come from `RULES` through the bundle.
+- **T5.5**: Señales was a placeholder; it is now the note themes ranked by lift (bilingual names in
+  `notes.THEME_LABELS`), split at the baseline, with a monthly trend and two example notes. Control
+  and Pulse: each chart's title is its finding, written by Python (`spc.finding`,
+  `series._finding`); Explícame on every chart (new `pulse` kind). Costo was restyled in T4.8.
+- **T5.6**: the rest of Python's web text is `L(...)`; `e2e/es.spec.ts` sweeps every screen in
+  Spanish for both roles. It found one leftover (the hand-kept events file, which now takes a
+  `label_es` column). A count typed into the day-14 note (5,526) is now computed.
+- Checks: `pytest tests/` 66 passed; `pnpm test` 20 passed; `pnpm typecheck`; `pnpm build`;
+  `pnpm e2e` 10 passed.
+- **For Miguel to decide:** the flag "En riesgo" is risk ≥ 0.5, which the segments bar calls
+  "Crítica"; the band "En riesgo" is 0.3–0.5. Both names come from the existing Python and I left
+  them. The simplest fix is to rename the flag "Riesgo crítico" (or the band "Riesgo medio").
