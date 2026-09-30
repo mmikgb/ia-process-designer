@@ -232,3 +232,25 @@ Key files: `src/bundle.py` (contract and web export), `src/kpi.py` (scopes, team
 `src/series.py` (Pulse), `src/spc.py`, `src/draft.py`, `src/llm.py`,
 `web/components/**` (screens), `web/lib/controls.ts` (filters, done/snooze),
 `PLAN_CS_Control_Room.md`, `FINDINGS.md`, `BUILD.md`.
+
+---
+
+## 11. Daily tool (`feat/daily-tool`): execution log
+
+Work on `SPEC_Daily_Tool.md`, one ticket per commit. Where the spec and the code disagree, the
+code wins and the difference is written here.
+
+### T0.1 Baseline, before any change (2026-09-30, Linux container, Python 3.11.15, Node 22.22.2, pnpm 10.33)
+
+| Step | Result | Time |
+|---|---|---|
+| `python3 src/bundle.py --no-cache` | ok, sha `87d65045a1c70b18`, 5,571 doctors, watchlist 954, bundle 23.4 MB, web view 763.5 KB | 15.3 s build (43 s wall incl. imports) |
+| Rebuilt `web/data/overview.json` vs committed | identical except `meta.built_at` | – |
+| `python3 src/analysis.py` | **fails** on a clean checkout: it reads `out/doctor_features.parquet`, which only `python3 src/pipeline.py` writes (`bundle.py` does not). After `pipeline.py` (9 s): exit 0 | 8 s |
+| Streamlit AppTest (`tests/test_streamlit.py`, new): 12 screens, both roles | 13 passed, 0 exceptions. One `PytestUnhandledThreadExceptionWarning` from the container's system `cryptography` package in a background thread (keyring); environment, not app | 34 s |
+| `pnpm install --frozen-lockfile` | ok | 7 s |
+| `pnpm typecheck` | ok | 5 s |
+| `pnpm build` | ok, 6 static routes; Recharts logs "width(-1) and height(-1)" while prerendering (harmless at build time). Note `ignoreBuildErrors: true` was still on | 12 s |
+
+Spec vs code: the spec says `analysis.py` runs after `bundle.py`; it actually needs `pipeline.py`
+first. Order to use: `pipeline.py` → `bundle.py` → `analysis.py`.
