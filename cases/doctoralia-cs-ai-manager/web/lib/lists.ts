@@ -24,6 +24,7 @@ export function listHref(scope: string, filter: Record<string, string>): string 
   const q = new URLSearchParams()
   if (/^S\d+$/.test(scope)) q.set("owner", scope)
   else if (scope.startsWith("team:")) q.set("team", scope.slice(5))
+  else q.set("scope", "all") // explicit: without it /doctores would use the viewer's own scope
   for (const [k, v] of Object.entries(filter)) q.set(k, v)
   return `/doctores?${q.toString()}`
 }

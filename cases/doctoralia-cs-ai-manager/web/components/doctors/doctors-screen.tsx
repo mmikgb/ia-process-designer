@@ -55,6 +55,7 @@ function useFilters() {
       specialty: p.get("specialty"),
       city: p.get("city"),
       q: p.get("q") ?? "",
+      all: p.get("scope") === "all",
       status: status === "churned" || status === "all" ? status : "active",
     }
   }, [p])
@@ -96,10 +97,11 @@ function Doctors() {
     if (specialist) return { owner: specialist, team: null as string | null }
     if (f.owner) return { owner: f.owner, team: null }
     if (f.team) return { owner: null, team: f.team }
+    if (f.all) return { owner: null, team: null }
     if (/^S\d+$/.test(scope)) return { owner: scope, team: null }
     if (scope.startsWith("team:")) return { owner: null, team: scope.slice(5) }
     return { owner: null, team: null }
-  }, [specialist, f.owner, f.team, scope])
+  }, [specialist, f.owner, f.team, f.all, scope])
 
   const filtered = useMemo(() => {
     if (!rows) return null

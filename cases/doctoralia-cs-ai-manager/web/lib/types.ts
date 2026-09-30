@@ -57,7 +57,7 @@ export interface KpiBlock {
   asof: string
   window_days: number
   health_score: number
-  health_note: string
+  health_note: Text
   kpis: KpiItem[]
   attention: AttentionItem[]
   segments: SegmentItem[]
