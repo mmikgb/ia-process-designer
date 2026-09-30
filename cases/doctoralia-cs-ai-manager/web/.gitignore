@@ -22,3 +22,8 @@ CLAUDE.md
 
 # The template is committed; the real key lives in .env.local
 !.env.example
+
+# Playwright
+e2e/.out/
+test-results/
+playwright-report/

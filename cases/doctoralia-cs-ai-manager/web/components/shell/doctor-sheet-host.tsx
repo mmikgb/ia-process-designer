@@ -15,9 +15,11 @@ export function DoctorSheetHost() {
 }
 
 /** Open a doctor from anywhere: keeps the current screen and its query, adds ?doctor=. */
-export function doctorHref(path: string, params: URLSearchParams | null, id: string): string {
+export function doctorHref(path: string, params: URLSearchParams | null, id: string, tab?: string): string {
   const q = new URLSearchParams(params?.toString() ?? "")
   q.set("doctor", id)
+  if (tab) q.set("tab", tab)
+  else q.delete("tab")
   return `${path}?${q.toString()}`
 }
 
@@ -49,9 +51,10 @@ function Host() {
   const close = useCallback(() => {
     const q = new URLSearchParams(params.toString())
     q.delete("doctor")
+    q.delete("tab")
     const rest = q.toString()
     router.replace(rest ? `${path}?${rest}` : path, { scroll: false })
   }, [params, path, router])
 
-  return <DoctorSheet target={target} onClose={close} />
+  return <DoctorSheet target={target} tab={params.get("tab")} onClose={close} />
 }

@@ -50,7 +50,8 @@ export function QueueRow({ y, day, className }: { y: Planned; day: Day; classNam
   const pill = usePill()(y)
   const style = BLOCK[y.block === "later" ? (y.origin ?? "later") : y.block]
   const Icon = style.icon
-  const open = () => router.push(doctorHref(path, params, y.doctor_id), { scroll: false })
+  // from the day plan, the sheet opens on the action: the draft is one click away
+  const open = () => router.push(doctorHref(path, params, y.doctor_id, "action"), { scroll: false })
   const copy = async () => {
     const d = (await loadBook(day.owner)).get(y.doctor_id)
     if (!d?.copilot.draft) return

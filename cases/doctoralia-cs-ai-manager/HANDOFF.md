@@ -469,3 +469,35 @@ first. Order to use: `pipeline.py` → `bundle.py` → `analysis.py`.
   Resumen worklist and the palette push it, so back closes and forward reopens (checked).
   Done/snooze is a shared store (`lib/handled.ts`).
 - Checked at 390, 900, 1440 px: no horizontal scroll; no console errors.
+
+### Phase 3: Hoy, focus mode, outcomes
+
+- **T3.3** Outcome log: `POST /api/work` (zod) appends to `out/work_log.jsonl` (override the
+  folder with `CS_OUT_DIR`), `GET /api/work?owner=` returns events and folded state. The browser
+  store (`lib/use-work.ts`) falls back to localStorage with a "Guardado solo en este navegador"
+  banner. `lib/dayplan.ts` is the web copy of `src/dayplan.py plan()`; `pnpm test`
+  (node --test, TS run natively) checks it reproduces all 14 queue files exactly, plus the
+  rescheduling rules (no answer +2 working days, sent +5, agreed on its date; not applicable
+  and routed leave; skipped stays; undo restores). `state.read_work_log()` for Streamlit and
+  report.py. Returning doctors are pinned ahead of the file's follow-ups and never go stale.
+- **T3.1** Hoy as specified; the four stat cards show "de N en total" when the cut hides some,
+  no deltas (nothing on this screen has n ≥ 10 history). Handoffs show 5 with "Ver todos" (70 per
+  book otherwise buries the screen). The capacity control (Miguel: dynamic) edits capacity,
+  quota and window per person, persisted in `cs:plan:<owner>`, reset to `RULES` in one click.
+  A manager sees the day of the specialist picked in the context switcher.
+- **T3.2** Focus mode walks calls, follow-ups and messages ("1 de 20"); handoffs keep their
+  bulk action. Keys listen in the capture phase (the dialog swallowed the arrow keys).
+  "Saltar" logs `skipped` (kept out of "Hecho hoy").
+- **T3.4** Doctor sheet v2 with the four tabs; the old panel is removed. The dossier gains
+  `onboarding_closed_at` and `calendar_enabled_at` for the timeline. Rows on Hoy open the sheet
+  on Acción (`?doctor=…&tab=action`).
+- **T3.5** `pnpm e2e` (Playwright; `PW_CHROMIUM_PATH` for a preinstalled Chromium; serves
+  with a fresh log in `e2e/.out`):
+  - **G1/G2**: fresh browser → pick Rafael Sandoval → Empezar shows the first call brief in
+    **2 clicks, 788 ms**; fresh browser → pick → "Mensajes listos" → first message row shows an
+    editable Spanish draft in **3 clicks, 987 ms** (limits: 3 and 4 clicks, 30 s).
+  - **T3.3 check**: 3 outcomes survive a reload; two working days later the no-answer doctor
+    is first under Seguimientos and the agreed one is back; undo restores the call.
+- Not done here: the bell and the Resumen worklist still read the file, not the log (the bell
+  counts the default cut); Resumen, Mi equipo, Pulse, Control, Costo inner text is still
+  English (phase 5).

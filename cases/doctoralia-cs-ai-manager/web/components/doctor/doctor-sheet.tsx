@@ -19,7 +19,15 @@ import { useShell } from "@/lib/shell"
 import type { Dossier, Flag } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
-export function DoctorSheet({ target, onClose }: { target: { id: string; owner: string } | null; onClose: () => void }) {
+export function DoctorSheet({
+  target,
+  tab: initialTab,
+  onClose,
+}: {
+  target: { id: string; owner: string } | null
+  tab?: string | null
+  onClose: () => void
+}) {
   const { t, pct } = useT()
   const shell = useShell()
   const clock = useClock()
@@ -30,7 +38,7 @@ export function DoctorSheet({ target, onClose }: { target: { id: string; owner: 
   useEffect(() => {
     let live = true
     setDoc(undefined)
-    setTab("summary")
+    setTab(initialTab && ["summary", "action", "ai", "history"].includes(initialTab) ? initialTab : "summary")
     if (!target) return
     if (!target.owner) {
       setDoc(null)
@@ -42,6 +50,7 @@ export function DoctorSheet({ target, onClose }: { target: { id: string; owner: 
     return () => {
       live = false
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target])
 
   const owner = doc ? (shell.specialists.find((s) => s.id === doc.owner_specialist_id)?.name ?? doc.owner_specialist_id) : ""
