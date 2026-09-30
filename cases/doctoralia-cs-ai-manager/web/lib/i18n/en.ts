@@ -311,6 +311,8 @@ export const en: Record<Key, string> = {
   "an.none": "Nothing recorded.",
   "an.loading": "Reading the record…",
   "an.summary": "AI analysis summary",
+  "summary.week": "What happened this week",
+  "summary.week.note": "Only \"real\" if a control chart flags it; the rest is normal variation.",
   "sheet.close": "Close",
   "sheet.loading": "Loading…",
   "sheet.missing": "This doctor is not in the current build.",

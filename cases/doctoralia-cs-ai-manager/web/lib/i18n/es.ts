@@ -321,6 +321,8 @@ export const es = {
   "an.none": "Nada registrado.",
   "an.loading": "Leyendo el expediente…",
   "an.summary": "Resumen del análisis IA",
+  "summary.week": "Qué pasó esta semana",
+  "summary.week.note": "Solo es \"real\" si una gráfica de control lo marca; lo demás es variación normal.",
   // doctor sheet
   "sheet.close": "Cerrar",
   "sheet.loading": "Cargando…",

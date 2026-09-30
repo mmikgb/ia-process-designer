@@ -283,7 +283,7 @@ export async function* run<I, O>(specIn: TaskSpec<I, O>, input: I, opts: Opts): 
     if (typeof output === "string" && spec.guard !== "reject") {
       for (const part of output.match(/[\s\S]{1,24}(?:\s|$)/g) ?? [output]) yield { type: "delta", text: part }
     }
-    await writeCache(spec.task, key, { output, meta: m })
+    // mock answers are not cached: a cached one would later read as a real model's
     yield done(output, m)
     return
   }

@@ -74,3 +74,49 @@ export function doctorFacts(d: Dossier) {
     owner: specialistName(d.owner_specialist_id),
   }
 }
+
+/** A scope's KPI block (30 days), in one language, with n and suppression. */
+export function kpiBlock(scope: string, locale: "es" | "en") {
+  const periods = (O.scopes[scope] ?? O.scopes.all).periods
+  const k = periods["30"] ?? Object.values(periods)[0]
+  const tx = (v: unknown) => (v && typeof v === "object" ? (v as Record<string, string>)[locale] : (v as string))
+  return {
+    window_days: k.window_days,
+    asof: k.asof,
+    health_score: k.health_score,
+    totals: k.totals,
+    kpis: k.kpis.map((x) => ({
+      key: x.key,
+      label: tx(x.label),
+      value: x.value,
+      prev: x.prev,
+      delta_pct: x.delta_pct,
+      n: x.n,
+      suppressed: x.suppressed ? tx(x.suppressed) : undefined,
+      note: tx(x.note),
+      good_direction: x.good,
+    })),
+  }
+}
+
+/**
+ * The control charts, cut to what a manager briefing needs: centre, the last limits and
+ * the signals in the last 28 days. "real" only when a signal is there.
+ */
+export function spcSummary(asof: string) {
+  const since = new Date(Date.parse(`${asof}T12:00:00Z`) - 28 * 864e5).toISOString().slice(0, 10)
+  return Object.entries(O.spc).map(([key, c]) => {
+    const recent = c.points.filter((p) => p.period >= since)
+    const last = c.points[c.points.length - 1]
+    const signals = recent.filter((p) => p.signals.length).map((p) => ({ period: p.period, value: p.value, rules: p.signals }))
+    return {
+      key,
+      label: c.label,
+      center: c.center,
+      last: last ? { period: last.period, value: last.value, ucl: last.ucl, lcl: last.lcl } : null,
+      signals_last_28_days: signals,
+      verdict: signals.length ? "signal" : "normal_variation",
+      baseline_stable: c.stability.stable,
+    }
+  })
+}

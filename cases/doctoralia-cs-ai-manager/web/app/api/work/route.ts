@@ -1,14 +1,13 @@
 // The outcome log: POST appends one line to out/work_log.jsonl (never rewrites it),
 // GET returns an owner's events and the folded state per doctor.
-import { appendFile, mkdir, readFile } from "node:fs/promises"
-import path from "node:path"
+import { appendFile, mkdir } from "node:fs/promises"
 import { z } from "zod"
+import { OUT } from "@/lib/server/paths"
+import { WORK_LOG as LOG, readWorkLog } from "@/lib/server/work-log"
 import { fold, newId, type WorkEvent } from "@/lib/work"
 
 export const dynamic = "force-dynamic"
 
-const OUT = process.env.CS_OUT_DIR ?? path.join(process.cwd(), "..", "out")
-const LOG = path.join(OUT, "work_log.jsonl")
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 const id = z.string().regex(/^[A-Za-z0-9_:.-]{1,40}$/)
 
@@ -29,27 +28,9 @@ const Body = z.object({
   undo_of: z.string().max(40).nullish(),
 })
 
-async function readLog(): Promise<WorkEvent[]> {
-  try {
-    const text = await readFile(LOG, "utf8")
-    return text
-      .split("\n")
-      .filter(Boolean)
-      .flatMap((l) => {
-        try {
-          return [JSON.parse(l) as WorkEvent]
-        } catch {
-          return [] // a torn line never takes the log down
-        }
-      })
-  } catch {
-    return []
-  }
-}
-
 export async function GET(req: Request) {
   const owner = new URL(req.url).searchParams.get("owner")
-  const events = (await readLog()).filter((e) => !owner || e.owner === owner)
+  const events = await readWorkLog(owner)
   return Response.json({ events, state: fold(events) })
 }
 

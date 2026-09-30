@@ -2,6 +2,7 @@
 
 import { Suspense } from "react"
 import { Page } from "@/components/shell/page"
+import { WeekCard } from "@/components/ai/week"
 import { Dashboard } from "@/components/overview/dashboard"
 import { useT } from "@/lib/i18n"
 import { useIdentity } from "@/lib/identity"
@@ -25,6 +26,7 @@ export function SummaryScreen({ data }: { data: OverviewData }) {
       title={t("nav.summary")}
       subtitle={t("summary.subtitle", { scope: label, n: num(book.active), risk: num(book.atRisk), days: 30 })}
     >
+      <WeekCard />
       <Suspense fallback={null}>
         <Dashboard data={data} />
       </Suspense>

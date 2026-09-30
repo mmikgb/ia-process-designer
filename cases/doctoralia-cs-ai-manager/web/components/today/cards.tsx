@@ -1,21 +1,27 @@
 "use client"
 
+import { useEffect } from "react"
 import { Play } from "lucide-react"
+import { ContextButton, Flagged, RegenerateButton, SourceBadge } from "@/components/ai/bits"
 import { BLOCK } from "@/components/today/style"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import type { Day } from "@/lib/day"
+import { useAi } from "@/lib/ai/client"
+import { actorOf, type Day } from "@/lib/day"
+import { useIdentity } from "@/lib/identity"
 import { addBusinessDays } from "@/lib/dates"
 import type { Block } from "@/lib/dayplan"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
-/** Deterministic briefing: the template over the day's own numbers. Phase 4 adds the AI one. */
+/** The day's briefing: the AI one when it is on, the template over the same numbers meanwhile or without it. */
 export function BriefingCard({ day, children }: { day: Day; children?: React.ReactNode }) {
-  const { t, tx } = useT()
+  const { t, tx, locale } = useT()
+  const { who } = useIdentity()
+  const ai = useAi<string>("/api/ai/briefing")
   const first = day.pending[0]
   const tomorrow = day.returning.filter((r) => r.due === addBusinessDays(day.today, 1)).length
-  const text = first
+  const template = first
     ? t("today.briefing.text", {
         calls: day.counts.call,
         fu: day.counts.followup,
@@ -24,16 +30,37 @@ export function BriefingCard({ day, children }: { day: Day; children?: React.Rea
         reason: tx(first.reason).replace(/\.$/, "").toLowerCase(),
       })
     : t("today.briefing.done", { done: day.done.length })
+  const body = (refresh = false) => ({
+    scope: day.owner,
+    app_day: day.today,
+    locale,
+    capacity: day.opts.capacity,
+    quota: day.opts.quota,
+    window: day.opts.window,
+    actor: actorOf(who),
+    refresh,
+  })
+  const run = ai.run
+  useEffect(() => {
+    void run(body())
+    // cached per owner per app day; changing capacity or the day asks again
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run, day.owner, day.today, locale, day.opts.capacity, day.opts.quota, day.opts.window])
+  const text = ai.text || template
   return (
     <div className="relative flex min-h-44 flex-col gap-3 overflow-hidden rounded-lg bg-linear-to-br from-[#005446] via-[#006a59] to-[#00806a] p-6 text-white shadow-card lg:col-span-2">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-[15px] font-semibold">{t("today.briefing.title")}</h2>
-        <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium">{t("today.briefing.auto")}</span>
+        <span className="flex items-center gap-1">
+          {ai.meta ? <SourceBadge meta={ai.meta} onDark /> : <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium">{t("today.briefing.auto")}</span>}
+          <ContextButton context={ai.context} onDark />
+          <RegenerateButton onClick={() => void run(body(true))} disabled={ai.loading} onDark />
+        </span>
       </div>
-      <p className="max-w-2xl text-[15px] leading-relaxed text-pretty text-white/95">{text}</p>
-      {tomorrow > 0 && (
-        <p className="text-sm text-white/80">{t("today.briefing.returning", { n: tomorrow })}</p>
-      )}
+      <p className="max-w-3xl text-[15px] leading-relaxed whitespace-pre-line text-pretty text-white/95">
+        <Flagged text={text} numbers={ai.meta?.flags.unverified_numbers ?? []} />
+      </p>
+      {!ai.text && tomorrow > 0 && <p className="text-sm text-white/80">{t("today.briefing.returning", { n: tomorrow })}</p>}
       {children}
     </div>
   )
