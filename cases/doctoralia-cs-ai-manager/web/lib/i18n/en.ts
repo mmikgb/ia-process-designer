@@ -377,6 +377,7 @@ export const en: Record<Key, string> = {
   "cost.task.briefing": "Daily briefing",
   "cost.task.explain": "Explain",
   "cost.task.doctor": "Doctor analysis",
+  "cost.task.speak": "Voice (ElevenLabs)",
   "cost.task.ask": "Ask your book",
   "cost.est.title": "What daily use would cost",
   "cost.est.per": "Per specialist, per month",
@@ -638,4 +639,11 @@ export const en: Record<Key, string> = {
   "signals.predictive": "Churn above the baseline",
   "signals.rest": "The other themes",
   "signals.rest.sub": "They weigh the same as the baseline or less: useful for the conversation, not for prioritising.",
+
+  // whatsapp + voice
+  "focus.whatsapp": "Send on WhatsApp",
+  "focus.whatsapp.hint": "Opens WhatsApp with the message ready; you pick the contact, then mark Sent (E).",
+  "ai.listen": "Listen",
+  "ai.listen.stop": "Stop",
+  "ai.listen.error": "The audio could not be generated.",
 }

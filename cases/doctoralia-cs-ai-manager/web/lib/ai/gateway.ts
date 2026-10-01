@@ -122,6 +122,8 @@ export async function status() {
     models: MODELS,
     budget: s.monthly_budget_usd,
     ai_runtime_enabled: s.ai_runtime_enabled !== false,
+    // speech (ElevenLabs) is its own key; the kill switch stops it too
+    tts: !why && (mock || !!process.env.ELEVENLABS_API_KEY),
   }
 }
 

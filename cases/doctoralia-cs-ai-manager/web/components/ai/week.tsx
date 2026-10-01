@@ -3,6 +3,7 @@
 // T4.4 manager variant on /resumen: "Qué pasó esta semana", real vs noise from the control charts.
 import { useEffect } from "react"
 import { ContextButton, Flagged, RegenerateButton, SourceBadge } from "@/components/ai/bits"
+import { ListenButton } from "@/components/ai/listen"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAi } from "@/lib/ai/client"
 import { useClock } from "@/lib/clock"
@@ -28,6 +29,7 @@ export function WeekCard() {
         <h2 className="text-[15px] font-semibold">{t("summary.week")}</h2>
         <span className="flex flex-wrap items-center gap-1">
           <SourceBadge meta={ai.meta} onDark />
+          <ListenButton text={ai.loading ? "" : ai.text} onDark />
           <ContextButton context={ai.context} onDark />
           <RegenerateButton onClick={() => void run(body(true))} disabled={ai.loading} onDark />
         </span>

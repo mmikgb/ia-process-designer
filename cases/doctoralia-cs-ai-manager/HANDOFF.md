@@ -695,3 +695,19 @@ and what was corrected), `web/.env.example` (+`CS_OUT_DIR`). Streamlit's typed "
 - `e2e/work.spec.ts` now uses S03: the rehearsal (T6.2) logs outcomes for S01 in the same run, and
   the full suite then failed on an undo count. With that, `pnpm e2e` and `CS_AI_MOCK=1 pnpm e2e`
   are **19 passed** each.
+
+## 14. Integrations (after the spec): WhatsApp and ElevenLabs
+
+- **WhatsApp**: "Enviar por WhatsApp" next to "Copiar" on every draft (focus mode and the doctor
+  sheet). A `wa.me/?text=` link with the current text, edits included; the dataset has no phone
+  numbers, so WhatsApp asks for the contact. It counts as using the draft (like copying it) and
+  the outcome stays the specialist's (`E`). No API, no Meta approval, no cost.
+- **ElevenLabs**: "Escuchar" on "Tu día" and "Qué pasó esta semana". `POST /api/ai/speak`
+  (`lib/ai/voice.ts`) calls ElevenLabs text to speech, voice "Ana Sofía – Conversational"
+  (`ewn5JTa3lNPY8QVuZJi6`, neutral Mexican Spanish, picked from the ElevenLabs voice library),
+  model `eleven_multilingual_v2`. The kill switch and `CS_AI_DISABLED` stop it; no
+  `ELEVENLABS_API_KEY`, no button; `CS_AI_MOCK=1` returns a short silent WAV. Every call writes a
+  ledger row (task `speak`, characters in `tokens_in`, cost 0: ElevenLabs bills its own account).
+- `e2e/integrations.spec.ts` covers both, with no key and with the mock. **Not verified: a real
+  ElevenLabs call** (no key here). If the API answers "voice not found", add the voice to "My
+  voices" in ElevenLabs or set `ELEVENLABS_VOICE_ID`.

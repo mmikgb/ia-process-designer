@@ -93,6 +93,7 @@ export interface AiStatus {
   by_task: Record<string, { calls: number; fallbacks: number; cost: number }>
   by_owner: Record<string, { calls: number; fallbacks: number; cost: number }>
   cache_hit: number | null
+  tts?: boolean
 }
 
 let statusCache: Promise<AiStatus | null> | null = null

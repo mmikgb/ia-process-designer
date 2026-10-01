@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Check, Copy, RotateCcw, TriangleAlert } from "lucide-react"
+import { Check, Copy, MessageCircle, RotateCcw, TriangleAlert } from "lucide-react"
 import { Writer } from "@/components/ai/writer"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { useT } from "@/lib/i18n"
 import type { Dossier } from "@/lib/types"
 
@@ -76,6 +76,20 @@ export function ActionPanel({
               {copied ? <Check /> : <Copy />}
               {copied ? t("focus.copied") : t("focus.copy")}
             </Button>
+            {/* WhatsApp with the message ready (the data has no phone numbers, so the
+                specialist picks the contact). Counts as using the draft, like copying it;
+                the outcome is still theirs to mark (E). */}
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(text)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => onCopied?.()}
+              title={t("focus.whatsapp.hint")}
+              className={buttonVariants({ size: "sm", variant: "outline" })}
+            >
+              <MessageCircle />
+              {t("focus.whatsapp")}
+            </a>
             {text !== original && (
               <Button size="sm" variant="ghost" onClick={() => setText(original)}>
                 <RotateCcw />

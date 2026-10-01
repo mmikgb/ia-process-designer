@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { Play } from "lucide-react"
 import { ContextButton, Flagged, RegenerateButton, SourceBadge } from "@/components/ai/bits"
+import { ListenButton } from "@/components/ai/listen"
 import { BLOCK } from "@/components/today/style"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -53,6 +54,7 @@ export function BriefingCard({ day, children }: { day: Day; children?: React.Rea
         <h2 className="text-[15px] font-semibold">{t("today.briefing.title")}</h2>
         <span className="flex flex-wrap items-center gap-1">
           {ai.meta ? <SourceBadge meta={ai.meta} onDark /> : <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium">{t("today.briefing.auto")}</span>}
+          <ListenButton text={ai.loading ? "" : text} owner={day.owner} onDark />
           <ContextButton context={ai.context} onDark />
           <RegenerateButton onClick={() => void run(body(true))} disabled={ai.loading} onDark />
         </span>

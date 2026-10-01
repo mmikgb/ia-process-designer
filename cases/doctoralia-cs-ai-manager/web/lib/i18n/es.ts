@@ -388,6 +388,7 @@ export const es = {
   "cost.task.briefing": "Resumen del día",
   "cost.task.explain": "Explícame",
   "cost.task.doctor": "Análisis de doctor",
+  "cost.task.speak": "Voz (ElevenLabs)",
   "cost.task.ask": "Pregúntale a tu cartera",
   "cost.est.title": "Lo que costaría el uso diario",
   "cost.est.per": "Por especialista, al mes",
@@ -649,6 +650,13 @@ export const es = {
   "signals.predictive": "Cancelan más que la base",
   "signals.rest": "El resto de los temas",
   "signals.rest.sub": "Pesan igual o menos que la base: sirven para la conversación, no para priorizar.",
+
+  // whatsapp + voice
+  "focus.whatsapp": "Enviar por WhatsApp",
+  "focus.whatsapp.hint": "Abre WhatsApp con el mensaje listo; eliges el contacto y luego marcas Enviado (E).",
+  "ai.listen": "Escuchar",
+  "ai.listen.stop": "Detener",
+  "ai.listen.error": "No se pudo generar el audio.",
 } as const
 
 export type Key = keyof typeof es

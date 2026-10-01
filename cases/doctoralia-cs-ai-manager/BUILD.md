@@ -58,6 +58,8 @@ Environment (`web/.env.local`, git-ignored; template in `web/.env.example`):
 | `CS_AI_MOCK` | — | `1` canned answers per task (tests, a demo with no key) |
 | `CS_CLOCK` | `snapshot` | `snapshot`: the data date plus "Avanzar un día"; `real`: today |
 | `CS_OUT_DIR` | `../out` | Outcome log, AI ledger, settings, AI cache |
+| `ELEVENLABS_API_KEY` | — | Turns on "Escuchar" (text to speech). Server only |
+| `ELEVENLABS_VOICE_ID` / `ELEVENLABS_MODEL` | Ana Sofía / `eleven_multilingual_v2` | The voice and model. A Voice Library voice may need "Add to my voices" first |
 
 No API key needed. Everything works with AI off; that is the default.
 

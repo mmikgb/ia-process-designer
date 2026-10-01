@@ -89,6 +89,12 @@ On top, the AI layer (all optional, all guarded):
 | Explícame | fast | Three sentences on one KPI, chart, team row or signal: what it measures, real change or noise, what to do |
 | Análisis IA | deep (Sonnet 5.5) | Reads the whole record; every claim carries its evidence and date |
 | Pregúntale a tu cartera (⌘J) | deep, with tools | Answers from search, doctor, KPI and queue tools over the same files; its buttons open the lists it counted |
+| Escuchar | ElevenLabs | Reads "Tu día" or "Qué pasó esta semana" aloud in Mexican Spanish. Its own key (`ELEVENLABS_API_KEY`); no key, no button |
+
+Drafts to doctors also open in **WhatsApp** with the text ready ("Enviar por WhatsApp", a
+`wa.me` link: the dataset has no phone numbers, so the specialist picks the contact and then
+marks the outcome). Sending through the WhatsApp Business API is the next step; it needs Meta's
+approval and approved templates.
 
 ## Where the model runs
 
