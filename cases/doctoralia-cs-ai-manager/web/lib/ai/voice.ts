@@ -46,12 +46,14 @@ async function tts(voice: string, text: string): Promise<Response> {
 }
 
 /** A voice this account can use: Spanish if it has one, else its first. From the account, never a guess. */
-async function accountVoice(): Promise<string | null> {
+async function accountVoice(): Promise<{ id: string | null; why?: string }> {
   const r = await fetch("https://api.elevenlabs.io/v1/voices", { headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY! } })
-  if (!r.ok) return null
-  const { voices } = (await r.json()) as { voices: { voice_id: string; labels?: Record<string, string> }[] }
-  const es = voices.find((v) => /es|spanish|mexic|latin/i.test(`${v.labels?.language ?? ""} ${v.labels?.accent ?? ""}`))
-  return (es ?? voices[0])?.voice_id ?? null
+  if (!r.ok) return { id: null, why: `could not list the account's voices (${r.status}; the key may lack "Voices: read")` }
+  const { voices } = (await r.json()) as { voices: { voice_id: string; category?: string; labels?: Record<string, string> }[] }
+  // library ("professional") voices are what the free plan refuses; keep the account's own
+  const usable = voices.filter((v) => v.category !== "professional")
+  const es = usable.find((v) => /es|spanish|mexic|latin/i.test(`${v.labels?.language ?? ""} ${v.labels?.accent ?? ""}`))
+  return { id: (es ?? usable[0])?.voice_id ?? null, why: usable.length ? undefined : "the account has no voices the plan can use" }
 }
 
 /**
@@ -63,8 +65,8 @@ export async function synthesize(text: string): Promise<ArrayBuffer> {
   let r = await tts(fallbackVoice ?? VOICE.id, text)
   if (!r.ok && !fallbackVoice && [400, 401, 402, 403, 404, 422].includes(r.status)) {
     const first = (await r.text()).slice(0, 300)
-    const v = await accountVoice()
-    if (!v) throw new Error(`elevenlabs ${r.status}: ${first}`)
+    const { id: v, why } = await accountVoice()
+    if (!v) throw new Error(`elevenlabs ${r.status}: ${first} | fallback: ${why}`)
     console.warn(`[speak] voice ${VOICE.id} refused (${r.status}: ${first}); using ${v} from the account`)
     fallbackVoice = v
     r = await tts(v, text)
