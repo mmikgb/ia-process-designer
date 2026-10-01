@@ -35,13 +35,40 @@ export function silentWav(seconds = 0.5, rate = 8000): Uint8Array {
   return new Uint8Array(buf)
 }
 
-/** MP3 bytes from ElevenLabs, or throws (the route turns that into a 502). */
-export async function synthesize(text: string): Promise<ArrayBuffer> {
-  const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE.id}?output_format=mp3_44100_128`, {
+let fallbackVoice: string | null = null
+
+async function tts(voice: string, text: string): Promise<Response> {
+  return fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_44100_128`, {
     method: "POST",
     headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY!, "content-type": "application/json", accept: "audio/mpeg" },
     body: JSON.stringify({ text, model_id: VOICE.model }),
   })
-  if (!r.ok) throw new Error(`elevenlabs ${r.status}: ${(await r.text()).slice(0, 200)}`)
+}
+
+/** A voice this account can use: Spanish if it has one, else its first. From the account, never a guess. */
+async function accountVoice(): Promise<string | null> {
+  const r = await fetch("https://api.elevenlabs.io/v1/voices", { headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY! } })
+  if (!r.ok) return null
+  const { voices } = (await r.json()) as { voices: { voice_id: string; labels?: Record<string, string> }[] }
+  const es = voices.find((v) => /es|spanish|mexic|latin/i.test(`${v.labels?.language ?? ""} ${v.labels?.accent ?? ""}`))
+  return (es ?? voices[0])?.voice_id ?? null
+}
+
+/**
+ * MP3 bytes from ElevenLabs, or throws with ElevenLabs' own message (the route returns it).
+ * A Voice Library voice is refused on the free plan, or until it is added to "My voices":
+ * then it retries once with a voice the account has, and keeps using that one.
+ */
+export async function synthesize(text: string): Promise<ArrayBuffer> {
+  let r = await tts(fallbackVoice ?? VOICE.id, text)
+  if (!r.ok && !fallbackVoice && [400, 401, 402, 403, 404, 422].includes(r.status)) {
+    const first = (await r.text()).slice(0, 300)
+    const v = await accountVoice()
+    if (!v) throw new Error(`elevenlabs ${r.status}: ${first}`)
+    console.warn(`[speak] voice ${VOICE.id} refused (${r.status}: ${first}); using ${v} from the account`)
+    fallbackVoice = v
+    r = await tts(v, text)
+  }
+  if (!r.ok) throw new Error(`elevenlabs ${r.status}: ${(await r.text()).slice(0, 300)}`)
   return r.arrayBuffer()
 }

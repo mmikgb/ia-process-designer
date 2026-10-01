@@ -33,7 +33,7 @@ export function ListenButton({ text, owner, onDark = false }: { text: string; ow
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ text, owner: owner ?? null }),
       })
-      if (!r.ok) throw new Error(String(r.status))
+      if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { error?: string } | null)?.error ?? String(r.status))
       const url = URL.createObjectURL(await r.blob())
       const a = new Audio(url)
       audio.current = a
@@ -43,9 +43,9 @@ export function ListenButton({ text, owner, onDark = false }: { text: string; ow
       }
       setState("playing")
       await a.play()
-    } catch {
+    } catch (e) {
       setState("idle")
-      toast(t("ai.listen.error"))
+      toast(t("ai.listen.error"), { description: e instanceof Error ? e.message.slice(0, 200) : undefined })
     } finally {
       void refreshAiStatus()
     }

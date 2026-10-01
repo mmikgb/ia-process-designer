@@ -32,7 +32,9 @@ export async function POST(req: Request) {
     await row("llm", true)
     return new Response(audio, { headers: { "content-type": "audio/mpeg", "cache-control": "no-store" } })
   } catch (e) {
+    const msg = e instanceof Error ? e.message : "error"
+    console.error(`[speak] ${msg}`) // the reason shows in the terminal running the app
     await row("fallback:error", false)
-    return Response.json({ error: e instanceof Error ? e.message : "error" }, { status: 502 })
+    return Response.json({ error: msg }, { status: 502 })
   }
 }
