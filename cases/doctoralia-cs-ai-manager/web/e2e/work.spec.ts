@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test"
 
 // T3.3: outcomes persist, reschedule and undo.
 test("mark 3 outcomes, reload, advance 2 working days, undo", async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("cs:who", '{"kind":"specialist","id":"S01"}'))
+  // its own book: the rehearsal logs outcomes for S01 in the same run
+  await page.addInitScript(() => localStorage.setItem("cs:who", '{"kind":"specialist","id":"S03"}'))
   await page.goto("/hoy")
   await page.getByRole("button", { name: "Empezar" }).click()
   const focus = page.getByRole("dialog", { name: "Modo ráfaga" })

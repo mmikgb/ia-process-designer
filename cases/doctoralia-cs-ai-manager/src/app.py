@@ -221,7 +221,7 @@ if screen == "Overview":
                 c1.caption(f"{r_.team_id} · {int(r_.portfolio)} accounts")
                 c2.markdown(f"<div style='text-align:right;font-size:15px;font-weight:600'>"
                             f"{r_.at_risk}</div><div style='text-align:right;font-size:11px;"
-                            f"color:{PAL['mut']}'>at risk</div>", unsafe_allow_html=True)
+                            f"color:{PAL['mut']}'>critical risk</div>", unsafe_allow_html=True)
         with st.container(border=True):
             st.caption("Escalation conversion by pickup latency")
             bk = [(x, ESC[ESC.pickup_bucket == x].converted.mean())

@@ -129,7 +129,7 @@ def build(t, doc, esc, ser, asof: pd.Timestamp, window: int = WINDOW, ctx: dict 
 
     share = pct(float((active.risk_score >= .5).mean())) if len(active) else "0%"
     kpis = [
-        _kpi("at_risk", L("Doctors at risk", "Doctores en riesgo"),
+        _kpi("at_risk", L("Doctors at critical risk", "Doctores en riesgo crítico"),
              int((active.risk_score >= .5).sum()), None, "{:,.0f}", "down",
              note=L(f"{share} of the active portfolio", f"{share} de la cartera activa")),
         _kpi("may_cancel", L("Said they may cancel", "Dijeron que cancelarían"),

@@ -124,8 +124,8 @@ function fallback(ctx: unknown, i: ExplainInput): string {
   if (i.kind === "team_row") {
     return T(
       L,
-      `${b.name}: ${b.portfolio} active doctors, ${b.at_risk} at risk, ${b.escalations} escalations${b.median_pickup != null ? `, median pickup ${b.median_pickup} min` : ""}. Under ${c.min_escalations} escalations there is a count, not a rate.`,
-      `${b.name}: ${b.portfolio} doctores activos, ${b.at_risk} en riesgo, ${b.escalations} escalaciones${b.median_pickup != null ? `, atención mediana de ${b.median_pickup} min` : ""}. Con menos de ${c.min_escalations} escalaciones se muestra el conteo, no un porcentaje.`,
+      `${b.name}: ${b.portfolio} active doctors, ${b.at_risk} at critical risk, ${b.escalations} escalations${b.median_pickup != null ? `, median pickup ${b.median_pickup} min` : ""}. Under ${c.min_escalations} escalations there is a count, not a rate.`,
+      `${b.name}: ${b.portfolio} doctores activos, ${b.at_risk} en riesgo crítico, ${b.escalations} escalaciones${b.median_pickup != null ? `, atención mediana de ${b.median_pickup} min` : ""}. Con menos de ${c.min_escalations} escalaciones se muestra el conteo, no un porcentaje.`,
     )
   }
   return T(

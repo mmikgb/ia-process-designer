@@ -238,7 +238,7 @@ def render(team_id, doc, esc, spec, teams) -> str:
     # 5 — this week's work
     h.append("<h2>5 · Work available to your team this week</h2><table>"
              "<tr><th>Specialist</th><th class=n>Portfolio</th><th class=n>May cancel</th>"
-             "<th class=n>At risk</th><th class=n>Agenda too thin</th>"
+             "<th class=n>Critical risk</th><th class=n>Agenda too thin</th>"
              "<th class=n>Not being found</th><th class=n>Open commitments</th></tr>")
     for _, s in sp.iterrows():
         p = mine[mine.owner_specialist_id == s.specialist_id]

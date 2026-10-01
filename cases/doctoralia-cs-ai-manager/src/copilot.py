@@ -50,7 +50,7 @@ st.caption(f"{me.specialist_name} · {len(mine)} active doctors · data as of 25
 
 c = st.columns(5)
 c[0].metric("Said they may cancel", int(mine.sig_churn_threat.sum()))
-c[1].metric("At risk (≥0.5)", int((mine.risk_score >= 0.5).sum()))
+c[1].metric("Critical risk (≥0.5)", int((mine.risk_score >= 0.5).sum()))
 c[2].metric("Not being found", int(mine.demand_constrained.sum()),
             help="Plenty of open slots, well below their specialty's median. Visibility problem, "
                  "not an agenda problem.")

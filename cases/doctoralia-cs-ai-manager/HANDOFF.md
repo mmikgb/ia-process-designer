@@ -688,5 +688,10 @@ and what was corrected), `web/.env.example` (+`CS_OUT_DIR`). Streamlit's typed "
   but no real traffic has gone through them.
 - **Browsers**: Chromium only (and Miguel's Chrome). Safari and Firefox not run.
 - **Several machines**: the outcome log is one file on one server.
-- **Open question for Miguel**: the "En riesgo" flag (risk ≥ 0.5) vs the "En riesgo" band
-  (0.3–0.5), see Phase 5.
+- ~~Open question~~ **Decided by Miguel (2026-10-01):** the risk ≥ 0.5 flag is now **"Riesgo
+  crítico" / "Critical risk"** everywhere it is shown (flag, KPI card, My team column, subtitles,
+  Streamlit, the HTML report, AI texts). The 0.3–0.5 band keeps "En riesgo". Internal keys
+  (`at_risk`) are unchanged, so links and tests did not move.
+- `e2e/work.spec.ts` now uses S03: the rehearsal (T6.2) logs outcomes for S01 in the same run, and
+  the full suite then failed on an undo count. With that, `pnpm e2e` and `CS_AI_MOCK=1 pnpm e2e`
+  are **19 passed** each.

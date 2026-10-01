@@ -246,7 +246,7 @@ async function mock(i: AskInput, trace: Trace): Promise<{ text: string; results:
     }
   }
   const s = (await runTool("search_doctors", { flags: ["at_risk"], limit: 5 }, i, trace)) as { count: number }
-  return { results: [s], text: T(l, `There are ${s.count} active doctors at risk in this view.`, `Hay ${s.count} doctores activos en riesgo en esta vista.`) }
+  return { results: [s], text: T(l, `There are ${s.count} active doctors at critical risk in this view.`, `Hay ${s.count} doctores activos en riesgo crítico en esta vista.`) }
 }
 
 // ---- the run --------------------------------------------------------------------------
