@@ -58,6 +58,7 @@ if not BUNDLE.exists():
 b, DOC, SPEC, ESC, BK, INTER = load(str(BUNDLE), BUNDLE.stat().st_mtime)
 M = b["meta"]
 RULES = M["rules"]
+TARGET = RULES["escalation_pickup_target_min"]  # the pickup target; copy quotes it, never "30"
 
 # ── sidebar ────────────────────────────────────────────────────────────────
 st.sidebar.markdown("### CS Control Room")
@@ -248,15 +249,17 @@ elif screen == "My day":
          "note": "they promised something and nothing moved"},
         {"label": "Median escalation pickup",
          "value": None if pd.isna(me.median_pickup_min) else float(me.median_pickup_min),
-         "prev": 30.0, "delta_pct": None if pd.isna(me.median_pickup_min)
-         else float((me.median_pickup_min - 30) / 30), "fmt": "{:.0f} min", "good": "down",
-         "spark": [], "note": "target is 30 minutes"},
+         "prev": float(TARGET), "delta_pct": None if pd.isna(me.median_pickup_min)
+         else float((me.median_pickup_min - TARGET) / TARGET), "fmt": "{:.0f} min", "good": "down",
+         "spark": [], "note": f"target is {TARGET} minutes"},
     ]
     kpi_row(mk, 5)
-    if pd.notna(me.median_pickup_min) and me.median_pickup_min > 30:
+    if pd.notna(me.median_pickup_min) and me.median_pickup_min > TARGET:
         st.warning(f"Your escalations wait a median of {me.median_pickup_min:.0f} minutes. Team-wide, "
-                   f"those answered inside 30 minutes convert at 54%; after two hours, 14%. Your own "
-                   f"conversion inside 30 minutes is {me.conversion_when_fast:.0%} — the same as "
+                   f"those answered inside {TARGET} minutes convert at "
+                   f"{ESC[ESC.within_target].converted.mean():.0%}; after two hours, "
+                   f"{ESC[ESC.pickup_bucket == '120m+'].converted.mean():.0%}. Your own "
+                   f"conversion inside {TARGET} minutes is {me.conversion_when_fast:.0%} — the same as "
                    "everyone else's. The queue is the problem, not the conversation.")
     f1, f2, f3 = st.columns([2, 2, 1])
     plays = ["all", "churn_threat", "open_commitment", "hollow_calendar", "visibility",
@@ -331,10 +334,12 @@ elif screen == "My team":
                f"{dem.weekly_slots_published.mean():.0f} slots and filling "
                f"{dem.bookings_per_slot.mean():.2f} of each. Telling that group to publish more is "
                "the one thing guaranteed not to work.")
+    fast_rates = [r["converted_when_fast"] for r in b["team"]["rows"]
+                  if r["converted_when_fast"] is not None and r["escalations"] >= b["team"]["min_escalations"]]
     with st.expander("What this screen leaves out, on purpose"):
-        st.markdown("""
+        st.markdown(f"""
 - **Raw conversion leaderboard** — it ranks people by how fast their queue moved. Inside the
-  30-minute bucket every specialist converts 50–59%.
+  {TARGET}-minute bucket every specialist converts {min(fast_rates):.0%}–{max(fast_rates):.0%}.
 - **Messages sent** — rewards volume, and phone calls are not in the data at all.
 - **CSAT / NPS** — not in this dataset.
 - **Cost to serve per doctor** — no time logs, no phone records. It belongs in an operating

@@ -51,3 +51,33 @@ fact-check on the polished draft — not a reviewer noticing.
 No churn model, no embedding search over the notes, no agent that sends messages. Each was
 available and each would have looked more impressive in a demo. None of them survive the
 question "what happens when this is wrong on a Tuesday and nobody notices until Friday".
+
+## The daily tool (`feat/daily-tool`): Claude Code
+
+| Tool | Used for |
+|---|---|
+| Claude Code (cloud session) | Executed `SPEC_Daily_Tool.md` ticket by ticket on `feat/daily-tool`: the Python day plan and web files, the Next.js app, the AI layer, the manager screens, the tests. One commit per ticket, its checks run first |
+| Claude Haiku 4.5 / Sonnet 5.5 (inside the app) | The runtime AI layer, behind the gateway and the number guard |
+
+Miguel set the direction at the spec's three pauses (the queue sizes, the shell's look, the AI
+settings and the key), answered the open questions (capacity, quota and window are per-person
+settings; the dataset is synthetic and goes in the repo) and ran the first real calls on his
+Mac. Every step is in `HANDOFF.md` §11.
+
+What had to be corrected along the way, each with a test that would have caught it:
+
+| What was produced | What was wrong | The fix |
+|---|---|---|
+| The number guard | "7 citas más" passed because a follow-up was due on the 7th, and a 0.36 share justified "36" without a `%` | A date's day and month justify a number only written as a date; a share becomes a percent only with `%`. Unit tests in Spanish |
+| Mock answers cached like real ones | A later visit showed "IA · Haiku · guardado" for a canned answer | Mock answers are never cached |
+| The ⌘J drawer | Crashed the page on Miguel's Chrome ("i is not a function"): an effect returned `scrollIntoView`'s Promise, which React then called as a cleanup. The container's Chromium returns `undefined`, so no test saw it | Effects use block bodies; the e2e makes `scrollIntoView` return a Promise |
+| `sync-data` | A stale `out/` on the Mac silently replaced the branch's data and `/costo` failed to build | `meta.web_schema`; an older `out/` is refused with the command to rebuild |
+| `/resumen` | Showed the whole portfolio for a moment before the identity loaded; a click then opened the wrong list | Waits for the identity; links for "all" say `scope=all` |
+| `search.json` | New fields pushed it over its 1 MB gate | Days as integers from the data date, flags and signals as bitmasks (875 KB), decoded in one function with a test against the bundle's bit orders |
+| The day-14 note | Carried a count typed into the code (5,526) | Computed from the data |
+| Streamlit copy | "30 minutes", "54%", "14%", "50–59%" typed in | Read from `RULES` and the measured buckets |
+| The rehearsal script | Its "move `visibility` above `hollow_calendar`" step can never change anything (the two conditions are disjoint) | The rehearsal uses `hollow_calendar` above `open_commitment`, which visibly reorders the messages |
+
+Not trusted without a check: every count shown in the app has a link to the list it counts, and
+`e2e/counts.spec.ts` clicks them and compares; the web day plan is checked line for line against
+Python's on all 14 specialists; the Spanish screens are swept for interface English.

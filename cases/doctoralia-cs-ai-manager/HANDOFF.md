@@ -658,3 +658,35 @@ Found while rehearsing, not a product bug: restoring an edited `.py` within the 
 with the same size can make Python reuse the edited file's `.pyc` (it checks mtime to the second
 and size), so the "restored" rebuild still showed the edit. The script now builds with `-B` and
 clears `src/__pycache__`. A hand edit in a live demo will not hit this.
+
+**T6.3 Docs.** README (what the daily tool produces, where the model runs, the cost), BUILD.md
+(commands, screens, environment variables, known gaps), `artifacts/ai-log.md` (Claude Code's part
+and what was corrected), `web/.env.example` (+`CS_OUT_DIR`). Streamlit's typed "30 minutes",
+"54%", "14%" and "50–59%" now read `RULES` and the measured buckets.
+
+## 12. Daily tool: the gates, with evidence
+
+| Gate | Met? | Evidence |
+|---|---|---|
+| **G1** their day, one click the first time, zero after | Yes | `e2e/g2.spec.ts`: pick the name (1 click) → `/hoy` with that book. The identity persists (`cs:who`); every other spec opens straight on its screen with no picker |
+| **G2** first action ≤ 3 clicks, draft ≤ 4, < 30 s | Yes | 2 clicks / 834 ms and 3 clicks / 846 ms (T6.1 run; earlier runs 2/788 and 3/987) |
+| **G3** every item closes with an outcome that changes the next day | Yes | `e2e/work.spec.ts` and the rehearsal: no answer back after 2 working days, agreed back on its date, undo restores; `tests/dayplan.test.ts` for the rules |
+| **G4** every count opens a list of that length | Yes | `e2e/counts.spec.ts`: every My team count for S01 and S07, the overview's counts, signals and bands |
+| **G5** AI on both paths, a fallback for each with no key | Yes | Briefing, analysis, writer, ask (specialist); week, Explícame on every chart (manager). Every spec passes with no key and with `CS_AI_MOCK=1`; the kill switch path is in the rehearsal |
+| **G6** no unflagged number outside the context | Yes, by construction | `web/lib/ai/guard.ts` runs on every output (`guard.test.ts`); messages to doctors are rejected, everything else is underlined |
+| **G7** Spanish and English, messages always Spanish | Yes | `e2e/es.spec.ts` (no interface English in ES, both roles), `e2e/smoke.spec.ts` (both languages), rehearsal step 10 |
+| **G8** a `PLAYS` or `RULES` edit visibly changes the day | Yes, on the files | `scripts/rehearse_live.py`: `hollow_calendar` above `open_commitment` turns today's 111 messages to `hollow_calendar`; slots 6 → 8 moves 540 → 799. `pnpm dev` reloads from those files; the reload itself was not watched in this session |
+
+## 13. Not verified
+
+- **The real model at volume.** Every AI surface ran in mock mode and with no key. Real calls: the
+  ⌘J assistant on Miguel's Mac (worked after the scrollIntoView fix). The analysis, writer,
+  briefing and Explícame have not been run against the real API here, and neither has the
+  server-side fallback on a refusal. The estimate of $3.60 per specialist a month is from the
+  usage table, not from a measured month.
+- **Prompt caching savings**: the cache_control blocks are sent; the ledger records cache reads,
+  but no real traffic has gone through them.
+- **Browsers**: Chromium only (and Miguel's Chrome). Safari and Firefox not run.
+- **Several machines**: the outcome log is one file on one server.
+- **Open question for Miguel**: the "En riesgo" flag (risk ≥ 0.5) vs the "En riesgo" band
+  (0.3–0.5), see Phase 5.

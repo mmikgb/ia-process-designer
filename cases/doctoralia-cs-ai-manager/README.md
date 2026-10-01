@@ -11,7 +11,10 @@ src/draft.py             play selection, confidence model, draft composition
 src/copilot.py           Deliverable 1 — specialist copilot (Streamlit)
 src/report.py            Deliverable 2 — manager report (static HTML)
 src/analysis.py          every number in FINDINGS.md, recomputed
-out/                     generated — feature tables, reports, data_quality.json
+src/bundle.py            the contract: one build that every surface reads, plus the web files
+src/dayplan.py           each specialist's day: who to call, follow up, message, hand off
+web/                     the daily tool (Next.js): Hoy, the doctor sheet, the AI layer, manager screens
+out/                     generated — feature tables, reports, data_quality.json, the web files
 FINDINGS.md              what the data says
 ```
 
@@ -25,8 +28,16 @@ streamlit run src/copilot.py     # the copilot
 python3 src/analysis.py          # verify every claim in FINDINGS.md
 ```
 
-The model is optional. Set `ANTHROPIC_API_KEY` to enable tone polishing in the copilot;
-without it everything still runs, because nothing depends on the model for a fact.
+The daily tool, in the browser:
+
+```bash
+python3 src/pipeline.py && python3 src/bundle.py   # the data and the web files
+cd web && pnpm install && pnpm dev                 # http://localhost:3000
+```
+
+The model is optional. Put `ANTHROPIC_API_KEY` in `web/.env.local` (git-ignored) to turn on the
+AI layer; without it every screen shows its deterministic version, because nothing depends on the
+model for a fact. `CS_AI_MOCK=1` gives canned answers for a demo with no key.
 
 ## How the two share a data layer
 
@@ -58,6 +69,35 @@ Three outputs, and two of them are refusals to write a message:
 Plus a channel note where the specialists have already recorded how to reach someone —
 WhatsApp only, the assistant runs the agenda, four attempts already logged.
 
+### What the daily tool produces (`web/`)
+
+A specialist opens **Hoy** and gets their day: up to 20 actions in four blocks (calls before the
+lead time runs out, the follow-ups they scheduled in their own notes, drafts ready to send,
+handoffs), cut and ranked by `src/dayplan.py`, with capacity, follow-up quota and window editable
+per person. **Empezar** walks it one doctor at a time; one key logs the outcome (sent, no answer,
+agreed on a date, not applicable), and the log brings the doctor back on the right day. Managers
+get **Resumen**, **Mi equipo** (with each specialist's follow-through from that log), **Pulse**,
+**Control**, **Señales** and **Costo IA**; every count opens the list of exactly those doctors
+(`/doctores`). Spanish by default, English one click away; messages to doctors are always Spanish.
+
+On top, the AI layer (all optional, all guarded):
+
+| Surface | Model | What it does |
+|---|---|---|
+| Message writer | fast (Haiku 4.5) | Rewrites a draft for a channel and tone, shows the diff. A number not in the record sends back the original |
+| Tu día / Qué pasó esta semana | fast | The specialist's morning and the manager's week, from the day plan and the control charts |
+| Explícame | fast | Three sentences on one KPI, chart, team row or signal: what it measures, real change or noise, what to do |
+| Análisis IA | deep (Sonnet 5.5) | Reads the whole record; every claim carries its evidence and date |
+| Pregúntale a tu cartera (⌘J) | deep, with tools | Answers from search, doctor, KPI and queue tools over the same files; its buttons open the lists it counted |
+
+## Where the model runs
+
+Only on the server, in one module (`web/lib/ai/gateway.ts`); the key never reaches the browser.
+It never throws: no key, AI switched off, budget reached, rate limit, a refusal or bad JSON each
+return the screen's deterministic version with the reason. Every call writes a ledger row, and
+`src/llm.py` adds that ledger to its own, so the monthly budget is shared. The kill switch and
+the budget are on `/costo`. Sonnet 5.5 runs with Anthropic's server-side fallback.
+
 ## Where the model is allowed to be wrong
 
 It is not allowed to supply a fact. Drafts are composed from the doctor's own record by
@@ -65,6 +105,11 @@ template. The model is given the finished draft and asked to rewrite it for tone
 hard instruction to add nothing — and the output is discarded automatically if it contains
 a number that was not in the input. So the failure mode is "the message reads a bit stiff",
 never "the message told a doctor something untrue about their account".
+
+The web layer applies the same rule to every surface: a guard (`web/lib/ai/guard.ts`) checks
+each number in an answer against what the model was given, flags what is not there with a dotted
+underline ("No está en los datos"), and for messages to doctors rejects the answer outright.
+"Ver contexto" shows exactly what the model saw.
 
 ## What it does when it is not confident
 
@@ -109,5 +154,7 @@ my opinion.
 
 ## AI tools used
 
-Claude (Opus 5) in Cowork, working against the workbook directly. What it produced and what
-I corrected is logged in `artifacts/ai-log.md`.
+Claude (Opus 5) in Cowork, working against the workbook directly, for the analysis and the
+first copilot and report; Claude Code for the daily tool (`feat/daily-tool`, from
+`SPEC_Daily_Tool.md`). What each produced and what was corrected is logged in
+`artifacts/ai-log.md`; the daily tool's build log is in `HANDOFF.md` §11.

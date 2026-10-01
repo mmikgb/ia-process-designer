@@ -1,7 +1,7 @@
 # CS Control Room — build notes
 
-Phases 1–6 of `PLAN_CS_Control_Room.md` are built and running. What is left is
-Pulse (`series.py` exists, the screen does not) and polish.
+Phases 1–6 of `PLAN_CS_Control_Room.md` are built and running, and on top of them the daily
+tool from `SPEC_Daily_Tool.md` (branch `feat/daily-tool`; build log in `HANDOFF.md` §11).
 
 ## Run it
 
@@ -13,39 +13,51 @@ python3 src/bundle.py          # build the contract — ~12s
 streamlit run src/app.py       # the app
 ```
 
-### The web dashboard (`web/`)
+### The web app (`web/`)
 
-Next.js + shadcn/ui + Recharts, first drafted in v0 with the Doctoralia palette.
-It reads `out/overview.json`, which every `bundle.py` run writes; `pnpm dev` and
-`pnpm build` copy it into `web/data/` first. The browser only picks which
-precomputed block to show and filters rows — every number is computed in Python.
+Next.js 16 + Tailwind v4 + Recharts, UI primitives on Base UI. It reads what `bundle.py` writes
+(`out/overview.json`, `out/queue/`, `out/doctors/`, `out/search.json`); `pnpm dev` and
+`pnpm build` copy them into `web/data` and `web/public` first, unless `out/` comes from an older
+`bundle.py` (`meta.web_schema` lower than the committed data), in which case it keeps the
+committed data and says how to rebuild. The browser only picks, filters, sorts and formats;
+every number, rank and draft is computed in Python.
 
 ```bash
-python3 src/bundle.py          # also writes out/overview.json
-cd web && pnpm install && pnpm dev    # http://localhost:3000
+python3 src/pipeline.py && python3 src/bundle.py   # the data and the web files (~20 s)
+cd web && pnpm install
+pnpm dev                    # http://localhost:3000, reloads when bundle.py rewrites the files
+pnpm build && pnpm start    # production
+pnpm typecheck              # tsc
+pnpm test                   # node --test: day-plan parity with Python, follow-through, guard, search decoding
+pnpm e2e                    # Playwright, 1440 light + 390 dark, fresh outcome log in e2e/.out
+CS_AI_MOCK=1 pnpm e2e       # the same with the mock model
 ```
 
-Five screens:
+`pnpm e2e` needs a Chromium; set `PW_CHROMIUM_PATH` to use an installed one.
 
-| Screen | Answers | Built from |
+| Screen | For | What it is |
 |---|---|---|
-| **Overview** | Where to act: KPIs per portfolio and period, attention signals, onboardings, the watchlist with lead times, the 38% ceiling, the day-14 checkpoint. Click a doctor for the panel with the copilot draft | `kpi.scopes`, `forecast`, `draft.compose` |
-| **My team** | Where is the work and who needs help: each specialist's book, pickup and conversion when fast. Every count opens that list | `kpi.team` |
-| **Pulse** | What has been happening day by day, with a range brush and events from `config/events.csv` | `series.pulse` |
-| **Control** | Real change or noise: four control charts, frozen baseline, labelled rules | `spc` |
-| **Cost** | What the AI would cost, and that everything runs with it off | `llm`, `insight` |
+| **Hoy** | specialist | The day: calls, follow-ups, drafts, handoffs (up to 20, editable per person), focus mode, outcomes, the morning briefing |
+| **Doctores** | both | The list behind every count, filters in the URL, CSV export |
+| **Señales** | both | The note themes ranked by measured churn lift |
+| **Resumen** | manager | KPIs, the health score, attention signals, risk bands, onboardings, "Qué pasó esta semana" |
+| **Mi equipo** | manager | Each specialist's book (every count a link), follow-through from the outcome log, escalation pickup |
+| **Pulse** | manager | Day by day, with a range brush and events from `config/events.csv` |
+| **Control** | manager | Real change or noise: four control charts, frozen baseline, the finding as the title |
+| **Costo IA** | manager | Live spend, kill switch and budget; the daily-use estimate; the one-off enrichment |
 
-**Live change during the demo.** Keep `pnpm dev` running. Edit a threshold in `pipeline.py`
-(`calendar_healthy_slots` 6 → 8 moves "Agenda too thin" from 540 to 799; no doctor publishes
-2–5 slots, so 5 changes nothing) or a play in `draft.py`, run `python3 src/bundle.py`, and the
-page updates by itself — `bundle.py` writes straight into `web/data` and `web/public/doctors`.
-The cache key includes the code and the rules, so an edit always rebuilds.
+Any doctor opens in a sheet addressed by the URL (`?doctor=D01184`). ⌘K searches, ⌘J asks.
 
-Controls: view as Manager / Specialist, portfolio (whole book, team, specialist),
-compare last 30 / 60 / 90 days, watchlist tier, signal, sort by lead time or risk,
-Done / Snooze 7d (kept in this browser), and the attention rows open the matching
-doctors. Thresholds are deliberately not a control: they live in `pipeline.py`
-so every screen shows the same number.
+Environment (`web/.env.local`, git-ignored; template in `web/.env.example`):
+
+| Variable | Default | What it does |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | — | Turns the AI layer on. Server only |
+| `CS_AI_MODEL_FAST` / `CS_AI_MODEL_DEEP` | Haiku 4.5 / Sonnet 5.5 | The two tiers |
+| `CS_AI_DISABLED` | — | `1` stops every call, whatever the settings say |
+| `CS_AI_MOCK` | — | `1` canned answers per task (tests, a demo with no key) |
+| `CS_CLOCK` | `snapshot` | `snapshot`: the data date plus "Avanzar un día"; `real`: today |
+| `CS_OUT_DIR` | `../out` | Outcome log, AI ledger, settings, AI cache |
 
 No API key needed. Everything works with AI off; that is the default.
 
@@ -116,10 +128,20 @@ that passed.
 | New note signal | `notes.py` | `RULES` list | `python3 src/bundle.py` |
 | Control limits | `spc.py` | `BASELINE` tuple | `python3 src/bundle.py` |
 
+`python3 scripts/rehearse_live.py` runs the two live changes of the rehearsal (a play order and a
+threshold), measures the day before and after, and restores everything. For the demo itself,
+make one of those edits by hand with `pnpm dev` running.
+
 ## Known gaps, stated rather than discovered
 
-- **Pulse screen not built.** `series.py` produces the data; the brushable screen is not there.
 - **Bundle is 23 MB** — mostly the 29,846 interactions. Loads in about a second, cached.
 - **No tickets, no phone.** Half of farming is reactive and the queue is blind to it.
+- **No login.** Who you are is a picker (kept in the browser), and `/api/ai/settings` (kill
+  switch, budget) has no auth: the web app is built for one machine or a trusted network.
+- **The outcome log is one file** (`out/work_log.jsonl`, append-only). Fine for one server; a
+  team on several machines needs it in a database. With no API (a static deploy) it falls back
+  to the browser and says so.
+- **Web files are ~25 MB** (`web/public`), mostly the per-specialist dossiers. Each screen loads
+  only what it needs; `search.json` stays under 1 MB.
 - **LLM enrichment not yet baked.** $1.754 one-off (Sonnet 5.5 themes + Haiku 4.5 summaries, batch), from the Settings screen. Until then the
   themes are the rules version, which is the deterministic path by design.
