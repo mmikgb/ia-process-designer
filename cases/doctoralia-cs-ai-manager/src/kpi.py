@@ -119,7 +119,10 @@ def build(t, doc, esc, ser, asof: pd.Timestamp, window: int = WINDOW) -> dict:
 
 # ---- scoped views: the same KPIs for a team or one specialist's portfolio ----
 
-PERIODS = [30, 60, 90]
+PERIODS = [30]
+# Rate KPIs are compared as they are; counts are compared per 100 active doctors,
+# because a 380-doctor book and a 5,200-doctor portfolio cannot be compared in units.
+RATE_KPIS = {"sla", "conversion", "onb_score", "grade_d"}
 BY_DOCTOR = ["doctors", "onboardings", "escalations", "interactions",
              "campaign_enrollments", "bookings_monthly"]
 
@@ -150,6 +153,10 @@ def scopes(t, doc, esc, asof: pd.Timestamp) -> dict:
     base = build(t, doc, esc, series.build(t), asof)
     lift = {a["key"]: (a["churn"], a["lift"]) for a in base["attention"]}
 
+    from spc import BASELINE
+    b0, b1 = pd.Timestamp(BASELINE[0]), pd.Timestamp(BASELINE[1])
+    team_of = {sid: f"team:{tn}" for tn, g in farm.groupby("team_name") for sid in g.specialist_id}
+
     out = {}
     for key, (ids, n_sp) in groups.items():
         ts, d, e = _slice(t, ids), doc[doc.doctor_id.isin(ids)], esc[esc.doctor_id.isin(ids)]
@@ -162,7 +169,40 @@ def scopes(t, doc, esc, asof: pd.Timestamp) -> dict:
             k["attention"].sort(key=lambda x: -x["lift"])
             k["totals"]["specialists"] = n_sp
             per[str(w)] = k
-        out[key] = {"periods": per, "weekly_onboardings": ser["weekly"]["onboardings"]}
+        # the same scope over the frozen control-chart baseline, for "compare with baseline"
+        base = build(ts, d, e, ser, b1, window=(b1 - b0).days)
+        out[key] = {"periods": per, "weekly_onboardings": ser["weekly"]["onboardings"],
+                    "_base": {k["key"]: k["value"] for k in base["kpis"]}}
+
+    def norm(block: dict) -> dict:
+        act = block["totals"]["active"] or 1
+        return {k["key"]: (k["value"] if k["key"] in RATE_KPIS or k["value"] is None
+                           else round(100 * k["value"] / act, 2)) for k in block["kpis"]}
+
+    def cmp(mine: dict, ref: dict, keys) -> dict:
+        res = {}
+        for k in keys:
+            m, r = mine.get(k), ref.get(k)
+            if m is None or r is None:
+                continue
+            res[k] = {"mine": m, "ref": r, "unit": "value" if k in RATE_KPIS else "per100",
+                      "delta_pct": None if not r else round((m - r) / abs(r), 4)}
+        return res
+
+    for key, sc in out.items():
+        cur = sc["periods"]["30"]
+        mine = norm(cur)
+        compare = {}
+        if key in team_of:
+            compare["team"] = cmp(mine, norm(out[team_of[key]]["periods"]["30"]), mine)
+        if key != "all":
+            compare["all"] = cmp(mine, norm(out["all"]["periods"]["30"]), mine)
+        # baseline: only the rates; counts are today's state and have no past value here
+        compare["baseline"] = cmp({k: v for k, v in mine.items() if k in RATE_KPIS},
+                                  sc["_base"], RATE_KPIS)
+        sc["compare"] = compare
+    for sc in out.values():
+        sc.pop("_base")
     return out
 
 

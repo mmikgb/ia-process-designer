@@ -118,6 +118,10 @@ def build(xlsx: Path | None = None, use_llm: bool = True, cache: bool = True) ->
         code.update(src.read_bytes())
     cached = CACHE / f"{h}-{code.hexdigest()[:8]}-v{SCHEMA_VERSION}.json"
     if cache and cached.exists():
+        # A cache hit must still become the current bundle: after a live rule change
+        # and its revert, the revert is a cache hit, and Streamlit reads app_data.json.
+        OUT.mkdir(exist_ok=True)
+        shutil.copyfile(cached, OUT / "app_data.json")
         b = json.loads(cached.read_text())
         b["meta"]["from_cache"] = True
         return b
@@ -180,6 +184,49 @@ WEB_RULES = ["calendar_healthy_slots", "escalation_pickup_target_min", "peer_low
              "stale_contact_days", "extract_date"]
 
 
+QUEUE_EXTRA = ["onboarding_grade", "days_since_contact"]
+
+
+def queue(b: dict) -> list[dict]:
+    """Every doctor a specialist might need to act on: the watchlist (a note gave a
+    warning) plus every active doctor at risk >= 0.50, so the list and the "Doctors at
+    risk" count can never disagree. Each row carries the copilot's action for it."""
+    doc = pd.DataFrame(b["doctors"])
+    by_id = doc.set_index("doctor_id")
+    names = {s["specialist_id"]: s["specialist_name"] for s in b["specialists"]}
+    rows = {w["doctor_id"]: {k: w[k] for k in WATCH_FIELDS} for w in b["predict"]["watchlist"]}
+    for _, r in doc[(doc.status == "active") & (doc.risk_score >= .5)].iterrows():
+        if r.doctor_id in rows:
+            continue
+        rows[r.doctor_id] = {
+            "doctor_id": r.doctor_id, "doctor_name": r.doctor_name, "specialty": r.specialty,
+            "city": r.city, "owner_specialist_id": r.owner_specialist_id,
+            "top_signal": r.top_signal if isinstance(r.top_signal, str) else None,
+            "days_elapsed": None, "lead_median": None, "days_of_lead_left": None,
+            "overdue": False, "tier": "none", "risk_score": r.risk_score,
+            "bookings_avg": r.bookings_avg, "median_specialty_city": r.median_specialty_city,
+            "signal_at": r.top_signal_at, "quote": r.top_signal_note}
+    out = []
+    for did, row in rows.items():
+        r = by_id.loc[did]
+        first = names.get(r.owner_specialist_id, "su especialista").split()[0]
+        res = D.compose(pd.Series({**r.to_dict(), "doctor_id": did}), first, "el jueves")
+        row.update({k: r[k] for k in QUEUE_EXTRA})
+        row["action"] = res["mode"] or "none"   # brief = call, draft = message, handoff = route
+        row["play"] = res["play"]
+        row["status"] = r.status
+        out.append(row)
+    return out
+
+
+def risk_rules() -> dict:
+    """How the risk score is built, straight from the table risk() adds up."""
+    return {"baseline_churn": P.BASELINE_CHURN, "cap": 1.0,
+            "rules": [{"key": k, "points": w, "label": label,
+                       "doctors": P.LIFT[lk][0], "churn": P.LIFT[lk][1], "lift": P.LIFT[lk][2]}
+                      for k, (w, lk, label) in P.RISK_WEIGHTS.items()]}
+
+
 def web_view(b: dict, top: int = 12) -> dict:
     """The slice of the bundle the Next.js app reads. Hundreds of KB, not 23 MB.
 
@@ -233,9 +280,10 @@ def web_view(b: dict, top: int = 12) -> dict:
             "lead_times": b["predict"]["lead_times"],
             "day14": {k: v for k, v in b["predict"]["day14"].items() if k != "worklist"},
         },
+        "risk": risk_rules(),
         "watchlist": {"tiers": tiers,
                       "act_now_top": [{k: w[k] for k in keep} for w in act],
-                      "items": [{k: w[k] for k in WATCH_FIELDS} for w in wl]},
+                      "items": queue(b)},
     }
 
 
@@ -244,7 +292,18 @@ DOSSIER_FIELDS = ["doctor_id", "doctor_name", "specialty", "city", "status", "si
                   "closed_at_cap", "sig_onboarding_no_show", "calendar_enabled",
                   "weekly_slots_published", "bookings_avg", "bookings_per_slot",
                   "pct_specialty_city", "median_specialty_city", "days_since_contact",
-                  "risk_score", "risk_reasons", "top_signal", "top_signal_at", "top_signal_note"]
+                  "risk_score", "risk_reasons", "top_signal", "top_signal_at", "top_signal_note",
+                  # the full profile
+                  "segment", "product", "calendar_enabled_at", "onboarding_days",
+                  "onboarding_closed_at", "bookings_last", "bookings_prev", "bookings_change_pct",
+                  "bookings_peak", "months_since_peak", "admin_share", "peer_gap",
+                  "bottom_quartile", "demand_constrained", "calendar_hollow", "last_contact",
+                  "contacts_total", "contacts_farming", "campaigns_enrolled", "campaigns_engaged",
+                  "campaigns_60d", "ignored_streak", "responds_to", "ignores", "escalations",
+                  "complaints", "commitment_open", "open_ask", "days_commitment_open",
+                  "upsell_signal", "upsell_note", "upsell_at", "sig_churn_threat", "sig_discouraged",
+                  "sig_whatsapp_only", "sig_gatekeeper", "sig_multi_site", "sig_billing_issue",
+                  "unanswered_outbound", "ever_replied"]
 
 
 def _num(v):
@@ -255,6 +314,7 @@ def _num(v):
 
 def dossiers(b: dict) -> dict[str, list]:
     """One file per owner: what the doctor panel shows, with the copilot's draft.
+    Contact history is not repeated here; it lives in doctors/chats/<owner>.json.
 
     The draft comes from draft.compose, the same call the Streamlit card makes,
     so the web panel and the Streamlit card cannot disagree about what to send.
@@ -262,18 +322,18 @@ def dossiers(b: dict) -> dict[str, list]:
     doc = pd.DataFrame(b["doctors"])
     names = {s["specialist_id"]: s["specialist_name"] for s in b["specialists"]}
     bk = pd.DataFrame(b["bookings"]).sort_values("month").groupby("doctor_id")
-    it = (pd.DataFrame(b["interactions"]).sort_values("occurred_at", ascending=False)
-          .groupby("doctor_id").head(6).groupby("doctor_id"))
     bk_d = {k: g[["month", "patient_bookings", "admin_bookings"]].to_dict("records") for k, g in bk}
-    it_d = {k: g[["occurred_at", "channel", "direction", "specialist_id", "note"]]
-            .to_dict("records") for k, g in it}
+    esc = pd.DataFrame(b["escalations"])
+    esc_d = {k: g.sort_values("escalated_at")[["escalated_at", "specialist_id", "minutes_to_pickup",
+                                                "converted"]].to_dict("records")
+             for k, g in esc.groupby("doctor_id")}
     out: dict[str, list] = {}
     for _, r in doc.iterrows():
         first = names.get(r.owner_specialist_id, "su especialista").split()[0]
         res = D.compose(r, first, "el jueves")
         d = {k: _num(r[k]) for k in DOSSIER_FIELDS}
         d["bookings"] = bk_d.get(r.doctor_id, [])
-        d["contacts"] = it_d.get(r.doctor_id, [])
+        d["escalation_log"] = esc_d.get(r.doctor_id, [])
         d["copilot"] = {k: res[k] for k in
                         ["mode", "play", "why", "ask", "draft", "instead", "channel",
                          "confident", "confidence", "gaps"]}
@@ -281,13 +341,39 @@ def dossiers(b: dict) -> dict[str, list]:
     return out
 
 
+def conversations(b: dict) -> dict[str, dict]:
+    """Every logged contact, per owner and doctor, oldest first, for the chat screen.
+    Rows are [date, channel, direction, specialist, note] to keep the files small."""
+    doc = pd.DataFrame(b["doctors"])[["doctor_id", "owner_specialist_id"]]
+    it = pd.DataFrame(b["interactions"]).merge(doc, on="doctor_id", how="left")
+    it = it.sort_values(["doctor_id", "occurred_at"])
+    out: dict[str, dict] = {}
+    for (owner, did), g in it.groupby(["owner_specialist_id", "doctor_id"]):
+        out.setdefault(owner, {})[did] = g[["occurred_at", "channel", "direction",
+                                            "specialist_id", "note"]].values.tolist()
+    return out
+
+
+def doctor_index(b: dict) -> dict:
+    """id -> [owner, name, specialty, city, status]: lets any page find a doctor's file."""
+    return {d["doctor_id"]: [d["owner_specialist_id"], d["doctor_name"], d["specialty"],
+                             d["city"], d["status"]] for d in b["doctors"]}
+
+
+def _dump(path: Path, obj) -> None:
+    path.write_text(json.dumps(_clean(obj), ensure_ascii=False, separators=(",", ":")))
+
+
 def write_web_view(b: dict) -> Path:
     OUT.mkdir(exist_ok=True)
     dd = OUT / "doctors"
-    dd.mkdir(exist_ok=True)
+    shutil.rmtree(dd, ignore_errors=True)
+    (dd / "chats").mkdir(parents=True)
     for owner, rows in dossiers(b).items():
-        (dd / f"{owner}.json").write_text(json.dumps(_clean(rows), ensure_ascii=False,
-                                                     separators=(",", ":")))
+        _dump(dd / f"{owner}.json", rows)
+    for owner, chats in conversations(b).items():
+        _dump(dd / "chats" / f"{owner}.json", chats)
+    _dump(dd / "index.json", doctor_index(b))
     p = OUT / "overview.json"
     p.write_text(json.dumps(web_view(b), ensure_ascii=False, separators=(",", ":")))
     # Hand the same files to the web app when it sits next door, so a running

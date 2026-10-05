@@ -1,3 +1,4 @@
+import { ManagersOnly } from "@/components/managers-only"
 import { SiteHeader } from "@/components/overview/site-header"
 import { TeamScreen } from "@/components/team/team-screen"
 import overview from "@/data/overview.json"
@@ -10,8 +11,10 @@ export const metadata = { title: "My team · CS Control Room" }
 export default function TeamPage() {
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-8 overflow-x-hidden px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-      <SiteHeader meta={data.meta} asof={data.kpi.asof} />
-      <TeamScreen data={data} />
+      <SiteHeader meta={data.meta} asof={data.kpi.asof} specialists={data.specialists} />
+      <ManagersOnly>
+        <TeamScreen data={data} />
+      </ManagersOnly>
     </main>
   )
 }

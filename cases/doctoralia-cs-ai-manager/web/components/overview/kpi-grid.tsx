@@ -6,22 +6,36 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { formatDeltaPct, isGoodDelta, pyFormat } from "@/lib/format"
-import type { KpiItem } from "@/lib/types"
+import type { CompareCell, KpiItem } from "@/lib/types"
 
-export function KpiGrid({ kpis }: { kpis: KpiItem[] }) {
+/**
+ * compare === null means "previous 30 days": each card's own prev and delta.
+ * Otherwise every card is set against the chosen reference, precomputed in Python.
+ */
+export function KpiGrid({
+  kpis,
+  compare,
+  refLabel,
+}: {
+  kpis: KpiItem[]
+  compare: Record<string, CompareCell> | null
+  refLabel: string
+}) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {kpis.map((kpi) => (
-        <KpiCard key={kpi.key} kpi={kpi} />
+        <KpiCard key={kpi.key} kpi={kpi} cell={compare ? (compare[kpi.key] ?? null) : undefined} refLabel={refLabel} />
       ))}
     </div>
   )
 }
 
-function KpiCard({ kpi }: { kpi: KpiItem }) {
-  const hasDelta = kpi.delta_pct !== null
-  const isIncrease = hasDelta && kpi.delta_pct! > 0
-  const good = hasDelta && isGoodDelta(kpi.delta_pct!, kpi.good)
+function KpiCard({ kpi, cell, refLabel }: { kpi: KpiItem; cell?: CompareCell | null; refLabel: string }) {
+  // undefined: previous-period mode. null: this measure has no value for the chosen reference.
+  const delta = cell === undefined ? kpi.delta_pct : (cell?.delta_pct ?? null)
+  const hasDelta = delta !== null
+  const isIncrease = hasDelta && delta! > 0
+  const good = hasDelta && isGoodDelta(delta!, kpi.good)
   const hasSpark = kpi.spark.length > 1
 
   return (
@@ -47,7 +61,7 @@ function KpiCard({ kpi }: { kpi: KpiItem }) {
               ) : (
                 <ArrowDown data-icon="inline-start" className="size-3" />
               )}
-              {formatDeltaPct(kpi.delta_pct!)}
+              {formatDeltaPct(delta!)}
             </Badge>
           )}
         </div>
@@ -89,6 +103,20 @@ function KpiCard({ kpi }: { kpi: KpiItem }) {
           </div>
         )}
 
+        {cell && (
+          <p className="text-xs tabular-nums text-foreground">
+            {cell.unit === "per100" ? (
+              <>
+                {cell.mine.toFixed(1)} per 100 doctors · {refLabel.toLowerCase()} {cell.ref.toFixed(1)}
+              </>
+            ) : (
+              <>
+                {refLabel}: {pyFormat(cell.ref, kpi.fmt)}
+              </>
+            )}
+          </p>
+        )}
+        {cell === null && <p className="text-xs text-muted-foreground">No {refLabel.toLowerCase()} value for this measure</p>}
         <p className="text-xs text-muted-foreground text-pretty">{kpi.note}</p>
       </CardContent>
     </Card>

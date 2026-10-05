@@ -25,15 +25,21 @@ python3 src/bundle.py          # also writes out/overview.json
 cd web && pnpm install && pnpm dev    # http://localhost:3000
 ```
 
-Five screens:
+Screens. **Viewing as** (top right) switches between a manager and one specialist. It
+is a demo switch, not a login: it decides what is shown.
 
-| Screen | Answers | Built from |
+| Screen | Who | Answers |
 |---|---|---|
-| **Overview** | Where to act: KPIs per portfolio and period, attention signals, onboardings, the watchlist with lead times, the 38% ceiling, the day-14 checkpoint. Click a doctor for the panel with the copilot draft | `kpi.scopes`, `forecast`, `draft.compose` |
-| **My team** | Where is the work and who needs help: each specialist's book, pickup and conversion when fast. Every count opens that list | `kpi.team` |
-| **Pulse** | What has been happening day by day, with a range brush and events from `config/events.csv` | `series.pulse` |
-| **Control** | Real change or noise: four control charts, frozen baseline, labelled rules | `spc` |
-| **Cost** | What the AI would cost, and that everything runs with it off | `llm`, `insight` |
+| **Overview / My day** | both | KPIs for the book, compared with the previous 30 days, the team, the whole portfolio or the Mar–Jun baseline; the work queue (act now, at risk, watch, overdue) with the copilot's action per doctor (call, message, route), sortable columns, done / snooze |
+| **Conversations** | both | Every logged contact as a chat, up to three open side by side; draft, Send on WhatsApp, log a note or a call |
+| **Doctor profile** (`/doctor?id=`) | both | Everything on file for one doctor; a specialist only opens their own |
+| **My team** | manager | Each book's work and escalation pickup, sortable; every count opens the list |
+| **Pulse** | manager | Daily series with a range brush and events from `config/events.csv` |
+| **Control** | manager | Four control charts, frozen baseline, labelled rules |
+| **Cost** | manager | What the AI would cost, and that everything runs with it off |
+
+Sending never happens from the app: "Send on WhatsApp" opens WhatsApp with the text ready and
+the specialist presses send. Done, snoozed and logged notes are kept in this browser only.
 
 **Live change during the demo.** Keep `pnpm dev` running. Edit a threshold in `pipeline.py`
 (`calendar_healthy_slots` 6 → 8 moves "Agenda too thin" from 540 to 799; no doctor publishes

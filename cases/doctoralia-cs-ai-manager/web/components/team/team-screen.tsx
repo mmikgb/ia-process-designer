@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import { SortTh, useSorted } from "@/components/sort-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { formatPercent } from "@/lib/format"
@@ -59,7 +60,7 @@ export function TeamScreen({ data }: { data: OverviewData }) {
   // Every count is a link: land on the overview with that specialist's book and the matching list.
   const open = (r: TeamRow, patch: Partial<Filters>) => {
     const base = loadFilters(data) ?? defaultFilters(data)
-    saveFilters({ ...base, role: "manager", scope: r.id, showHandled: false, ...patch })
+    saveFilters({ ...base, scope: r.id, compare: "prev", showHandled: false, ...patch })
     router.push("/#worklist")
   }
   const Count = ({ r, v, patch, label }: { r: TeamRow; v: number; patch: Partial<Filters>; label: string }) => (
@@ -72,6 +73,21 @@ export function TeamScreen({ data }: { data: OverviewData }) {
       {v.toLocaleString("en-US")}
     </button>
   )
+
+  type BookKey = "name" | "portfolio" | "at_risk" | "may_cancel" | "hollow" | "not_found" | "open_commitments"
+  type PickKey = "name" | "escalations" | "median_pickup" | "within_target" | "converted" | "converted_when_fast"
+  const book = useSorted<TeamRow, BookKey>(
+    rows,
+    (r, k) => (k === "name" ? r.name : k === "at_risk" ? r.at_risk_share : r[k]),
+    { key: "at_risk", dir: "desc" },
+  )
+  const pick = useSorted<TeamRow, PickKey>(
+    rows,
+    (r, k) => (k === "name" ? r.name : r[k]),
+    { key: "median_pickup", dir: "desc" },
+  )
+  const bookTh = { sortKey: book.sortKey, dir: book.dir, onSort: book.onSort }
+  const pickTh = { sortKey: pick.sortKey, dir: pick.dir, onSort: pick.onSort }
 
   const fast = team.buckets[0]
   const slow = team.buckets[team.buckets.length - 1]
@@ -118,18 +134,18 @@ export function TeamScreen({ data }: { data: OverviewData }) {
         <CardContent className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                <th className="py-2 pr-3 font-medium">Specialist</th>
-                <th className="py-2 pr-3 text-right font-medium">Portfolio</th>
-                <th className="py-2 pr-3 font-medium">At risk</th>
-                <th className="py-2 pr-3 text-right font-medium">May cancel</th>
-                <th className="py-2 pr-3 text-right font-medium">Agenda too thin</th>
-                <th className="py-2 pr-3 text-right font-medium">Not being found</th>
-                <th className="py-2 text-right font-medium">Open commitments</th>
+              <tr className="border-b border-border text-left">
+                <SortTh label="Specialist" k="name" {...bookTh} firstDir="asc" />
+                <SortTh label="Portfolio" k="portfolio" {...bookTh} align="right" />
+                <SortTh label="At risk" k="at_risk" {...bookTh} title="Sorted by the share of the book at risk" />
+                <SortTh label="May cancel" k="may_cancel" {...bookTh} align="right" />
+                <SortTh label="Agenda too thin" k="hollow" {...bookTh} align="right" />
+                <SortTh label="Not being found" k="not_found" {...bookTh} align="right" />
+                <SortTh label="Open commitments" k="open_commitments" {...bookTh} align="right" />
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {book.sorted.map((r) => (
                 <tr key={r.id} className="border-b border-border last:border-0">
                   <td className="py-2 pr-3">
                     <span className="font-medium text-foreground">{r.name}</span>
@@ -139,7 +155,7 @@ export function TeamScreen({ data }: { data: OverviewData }) {
                   <td className="py-2 pr-3">
                     {/* workload balance: share of the book at risk, same scale for everyone */}
                     <div className="flex items-center gap-2">
-                      <Count r={r} v={r.at_risk} label="At risk" patch={{ tier: "all", signal: "all", sort: "risk" }} />
+                      <Count r={r} v={r.at_risk} label="At risk" patch={{ tier: "at_risk", signal: "all", action: "all", sortKey: "risk", sortDir: "desc" }} />
                       <div className="h-1.5 w-20 rounded-full bg-muted">
                         <div className="h-full rounded-full bg-foreground/60" style={{ width: `${((r.at_risk_share ?? 0) / maxShare) * 100}%` }} />
                       </div>
@@ -147,7 +163,7 @@ export function TeamScreen({ data }: { data: OverviewData }) {
                     </div>
                   </td>
                   <td className="py-2 pr-3 text-right">
-                    <Count r={r} v={r.may_cancel} label="May cancel" patch={{ tier: "all", signal: "churn_threat", sort: "lead" }} />
+                    <Count r={r} v={r.may_cancel} label="May cancel" patch={{ tier: "all", signal: "churn_threat", action: "all", sortKey: "lead", sortDir: "asc" }} />
                   </td>
                   <td className="py-2 pr-3 text-right tabular-nums">{r.hollow}</td>
                   <td className="py-2 pr-3 text-right tabular-nums">{r.not_found}</td>
@@ -177,17 +193,17 @@ export function TeamScreen({ data }: { data: OverviewData }) {
           <CardContent className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
               <thead>
-                <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="py-2 pr-3 font-medium">Specialist</th>
-                  <th className="py-2 pr-3 text-right font-medium">Escalations</th>
-                  <th className="py-2 pr-3 font-medium">Median pickup, last 12 weeks</th>
-                  <th className="py-2 pr-3 text-right font-medium">Inside {team.target_min}m</th>
-                  <th className="py-2 pr-3 text-right font-medium">Converted</th>
-                  <th className="py-2 text-right font-medium">When fast</th>
+                <tr className="border-b border-border text-left">
+                  <SortTh label="Specialist" k="name" {...pickTh} firstDir="asc" />
+                  <SortTh label="Escalations" k="escalations" {...pickTh} align="right" />
+                  <SortTh label="Median pickup, last 12 weeks" k="median_pickup" {...pickTh} />
+                  <SortTh label={`Inside ${team.target_min}m`} k="within_target" {...pickTh} align="right" />
+                  <SortTh label="Converted" k="converted" {...pickTh} align="right" />
+                  <SortTh label="When fast" k="converted_when_fast" {...pickTh} align="right" />
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
+                {pick.sorted.map((r) => (
                   <tr key={r.id} className="border-b border-border last:border-0">
                     <td className="py-2 pr-3 font-medium text-foreground">{r.name.split(" ").slice(0, 2).join(" ")}</td>
                     <td className="py-2 pr-3 text-right tabular-nums">{r.escalations}</td>

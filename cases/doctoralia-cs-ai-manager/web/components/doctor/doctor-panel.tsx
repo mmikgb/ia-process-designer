@@ -1,14 +1,17 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import Link from "next/link"
 import { Check, Clock, Copy, PhoneCall, Route, X } from "lucide-react"
+import { RiskExplainer } from "@/components/risk-explainer"
+import { WhatsAppButton } from "@/components/whatsapp-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { formatPercent } from "@/lib/format"
-import { loadDossier } from "@/lib/dossiers"
+import { MISSING_FILES, loadChats, loadDossier } from "@/lib/dossiers"
 import type { Handled } from "@/lib/controls"
-import type { Dossier } from "@/lib/types"
+import type { ChatRow, Dossier, RiskRules } from "@/lib/types"
 
 const MODE: Record<string, { label: string; icon: typeof Copy }> = {
   draft: { label: "Draft message", icon: Copy },
@@ -16,7 +19,7 @@ const MODE: Record<string, { label: string; icon: typeof Copy }> = {
   handoff: { label: "Route it", icon: Route },
 }
 
-function Fact({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
+export function Fact({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
   return (
     <div className="flex flex-col gap-0.5 rounded-lg border border-border bg-background px-3 py-2">
       <span className="text-xs text-muted-foreground">{label}</span>
@@ -27,7 +30,7 @@ function Fact({ label, value, hint }: { label: string; value: React.ReactNode; h
 }
 
 /** Five monthly points drawn as points, because five points are not a trend line. */
-function MonthlyDots({ rows, peer }: { rows: Dossier["bookings"]; peer: number | null }) {
+export function MonthlyDots({ rows, peer }: { rows: Dossier["bookings"]; peer: number | null }) {
   if (!rows.length) return <p className="text-sm text-muted-foreground">No bookings recorded.</p>
   const max = Math.max(...rows.map((r) => r.patient_bookings), peer ?? 0, 1)
   const W = 280
@@ -62,12 +65,14 @@ function MonthlyDots({ rows, peer }: { rows: Dossier["bookings"]; peer: number |
 export function DoctorPanel({
   target,
   ownerName,
+  risk,
   handled,
   onHandle,
   onClose,
 }: {
   target: { id: string; owner: string } | null
   ownerName: (id: string) => string
+  risk: RiskRules
   handled: Handled | undefined
   onHandle: (h: Handled | null) => void
   onClose: () => void
@@ -76,6 +81,7 @@ export function DoctorPanel({
   const [error, setError] = useState<string | null>(null)
   const [text, setText] = useState("")
   const [copied, setCopied] = useState(false)
+  const [contacts, setContacts] = useState<ChatRow[]>([])
   const closeRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -83,13 +89,17 @@ export function DoctorPanel({
     setDoc(null)
     setError(null)
     setCopied(false)
+    setContacts([])
     loadDossier(target.owner, target.id)
       .then((d) => {
         if (!d) setError("This doctor is not in the current build.")
         setDoc(d)
         setText(d?.copilot.draft ?? "")
       })
-      .catch(() => setError("Doctor files are missing. Run python3 src/bundle.py, then restart pnpm dev."))
+      .catch(() => setError(MISSING_FILES))
+    loadChats(target.owner)
+      .then((c) => setContacts((c[target.id] ?? []).slice(-6).reverse()))
+      .catch(() => setContacts([]))
     closeRef.current?.focus()
   }, [target])
 
@@ -147,6 +157,7 @@ export function DoctorPanel({
                 <span className="font-medium">Why now: </span>
                 {doc.risk_reasons || "no active signal"}
               </p>
+              <RiskExplainer risk={risk} reasons={doc.risk_reasons} />
               {doc.top_signal_note && (
                 <blockquote className="border-l-2 border-border pl-3 text-sm italic text-foreground text-pretty">
                   &ldquo;{doc.top_signal_note}&rdquo;
@@ -180,8 +191,12 @@ export function DoctorPanel({
                     className="w-full resize-y rounded-lg border border-input bg-card p-3 text-sm leading-relaxed text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     aria-label="Draft message, editable"
                   />
-                  <div className="flex items-center gap-2">
-                    <Button size="sm" onClick={copy}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <WhatsAppButton
+                      text={text}
+                      onOpened={() => onHandle({ state: "done", at: today, via: "whatsapp" })}
+                    />
+                    <Button size="sm" variant="outline" onClick={copy}>
                       {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
                       {copied ? "Copied" : "Copy draft"}
                     </Button>
@@ -191,9 +206,19 @@ export function DoctorPanel({
                       </Button>
                     )}
                   </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Opens WhatsApp with this text; you choose the chat and press send. Marked as sent here.
+                  </p>
                 </>
               ) : (
-                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-foreground">{doc.copilot.instead}</pre>
+                <>
+                  <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-foreground">{doc.copilot.instead}</pre>
+                  {doc.copilot.mode === "brief" && !handled && (
+                    <Button size="sm" className="w-fit" onClick={() => onHandle({ state: "done", at: today, via: "call" })}>
+                      <PhoneCall className="size-3.5" /> Mark call done
+                    </Button>
+                  )}
+                </>
               )}
             </section>
 
@@ -231,20 +256,28 @@ export function DoctorPanel({
 
             <section className="flex flex-col gap-2">
               <h3 className="text-sm font-semibold text-foreground">Last contacts</h3>
-              {doc.contacts.length === 0 ? (
+              {contacts.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No contacts recorded.</p>
               ) : (
                 <ol className="flex flex-col gap-2">
-                  {doc.contacts.map((c, i) => (
+                  {contacts.map(([at, channel, dir, who, note], i) => (
                     <li key={i} className="flex flex-col gap-0.5 border-l-2 border-border pl-3">
                       <span className="text-xs tabular-nums text-muted-foreground">
-                        {c.occurred_at} · {c.channel} · {c.direction} · {ownerName(c.specialist_id)}
+                        {at} · {channel} · {dir} · {ownerName(who)}
                       </span>
-                      <span className="text-sm text-foreground text-pretty">{c.note ?? "—"}</span>
+                      <span className="text-sm text-foreground text-pretty">{note ?? "—"}</span>
                     </li>
                   ))}
                 </ol>
               )}
+              <div className="flex gap-4 pt-1 text-sm">
+                <Link href={`/doctor?id=${doc.doctor_id}`} className="text-primary underline-offset-4 hover:underline">
+                  Full profile →
+                </Link>
+                <Link href={`/conversations?open=${doc.doctor_id}`} className="text-primary underline-offset-4 hover:underline">
+                  Open conversation →
+                </Link>
+              </div>
             </section>
           </div>
         )}
@@ -252,7 +285,7 @@ export function DoctorPanel({
         <footer className="sticky bottom-0 mt-auto flex gap-2 border-t border-border bg-card px-5 py-3">
           {handled ? (
             <Button variant="outline" size="sm" onClick={() => onHandle(null)}>
-              Undo {handled.state === "done" ? "done" : "snooze"}
+              Undo {handled.state === "done" ? (handled.via === "whatsapp" ? "sent" : handled.via === "call" ? "call done" : "done") : "snooze"}
             </Button>
           ) : (
             <>

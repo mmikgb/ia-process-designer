@@ -258,7 +258,7 @@ elif screen == "My day":
                    f"conversion inside 30 minutes is {me.conversion_when_fast:.0%} — the same as "
                    "everyone else's. The queue is the problem, not the conversation.")
     f1, f2, f3 = st.columns([2, 2, 1])
-    plays = ["all", "churn_threat", "open_commitment", "hollow_calendar", "visibility",
+    plays = ["all", "churn_threat", "discouraged", "open_commitment", "hollow_calendar", "visibility",
              "complaint_no_patients", "calendar_off", "grade_d_recovery", "upsell_lead"]
     pick = f1.selectbox("Play", plays)
     n = f2.slider("Accounts", 5, 40, 12)

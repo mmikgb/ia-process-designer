@@ -270,6 +270,22 @@ LIFT = {
 }
 BASELINE_CHURN = 0.066
 
+# The weights risk() adds, in one table so screens can show exactly how the score is
+# built. key -> (points, LIFT key, plain description). Signals in the same group are
+# exclusive: only the strongest one counts.
+RISK_WEIGHTS = {
+    "churn_threat":    (0.50, "churn_threat",    "Said they would cancel or are comparing platforms"),
+    "discouraged":     (0.25, "discouraged",     "Noted as discouraged with results (only if no cancel threat)"),
+    "grade_D":         (0.30, "grade_D",         "Closed onboarding at grade D"),
+    "grade_C":         (0.10, "grade_C",         "Closed onboarding at grade C"),
+    "bottom_quartile": (0.20, "bottom_quartile", "Bottom quartile of bookings for their specialty and city"),
+    "calendar_off":    (0.18, "calendar_off",    "Online calendar never turned on"),
+    "complaint":       (0.12, "complaint",       "Complained about patient volume or no-shows"),
+    "calendar_hollow": (0.08, "calendar_hollow", "Calendar on but too few slots published"),
+    "ignored_streak":  (0.05, "ignored_streak",  "Ignored 3 or more campaigns in a row"),
+}
+W = {k: v[0] for k, v in RISK_WEIGHTS.items()}
+
 
 def risk(r) -> tuple[float, str]:
     """Additive, inspectable, capped at 1.0. No model — every point traces to one
@@ -285,32 +301,32 @@ def risk(r) -> tuple[float, str]:
     # What the doctor said, as their own specialist wrote it down. Strongest signal
     # in the file by a factor of two, and it lived in free text nobody queried.
     if r.sig_churn_threat:
-        add(0.50, "said they would cancel or are comparing platforms (36% of these churn)")
+        add(W["churn_threat"], "said they would cancel or are comparing platforms (36% of these churn)")
     elif r.sig_discouraged:
-        add(0.25, "noted as discouraged with results (15% churn)")
+        add(W["discouraged"], "noted as discouraged with results (15% churn)")
 
     if r.complaints >= 1:
-        add(0.12, f"{int(r.complaints)} complaint(s) logged about patient volume or no-shows")
+        add(W["complaint"], f"{int(r.complaints)} complaint(s) logged about patient volume or no-shows")
 
     # How they start predicts how they end.
     if r.onboarding_grade == "D":
-        add(0.30, "closed onboarding at grade D (17% churn)")
+        add(W["grade_D"], "closed onboarding at grade D (17% churn)")
     elif r.onboarding_grade == "C":
-        add(0.10, "closed onboarding at grade C")
+        add(W["grade_C"], "closed onboarding at grade C")
 
     # The activation step that matters.
     if not r.calendar_enabled:
-        add(0.18, "online calendar never turned on (11% churn)")
+        add(W["calendar_off"], "online calendar never turned on (11% churn)")
     elif r.calendar_hollow:
-        add(0.08, f"calendar on but only {int(r.weekly_slots_published)} slots published")
+        add(W["calendar_hollow"], f"calendar on but only {int(r.weekly_slots_published)} slots published")
 
     # Against their own peers, not against the platform average.
     if r.bottom_quartile and pd.notna(r.median_specialty_city):
-        add(0.20, f"bottom quartile for {r.specialty} in {r.city} "
+        add(W["bottom_quartile"], f"bottom quartile for {r.specialty} in {r.city} "
                   f"({r.bookings_avg:.0f}/mo vs {r.median_specialty_city:.0f} median)")
 
     if r.ignored_streak >= 3:
-        add(0.05, f"ignored the last {int(r.ignored_streak)} campaigns in a row")
+        add(W["ignored_streak"], f"ignored the last {int(r.ignored_streak)} campaigns in a row")
 
     return round(min(pts, 1.0), 2), " · ".join(why)
 

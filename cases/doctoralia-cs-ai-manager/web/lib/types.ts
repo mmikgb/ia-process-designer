@@ -79,13 +79,26 @@ export interface WatchlistTiers {
 }
 
 /** One watchlist row. Every doctor with a live warning, not just the top 12. */
-export interface WatchItem extends ActNowItem {
-  days_elapsed: number
-  lead_median: number
+/**
+ * One row of the work queue: every doctor on the watchlist (a warning note) plus
+ * every active doctor at risk >= 0.50. `tier` is "none" for the second kind.
+ */
+export interface WatchItem extends Omit<ActNowItem, "days_of_lead_left" | "tier" | "top_signal" | "quote"> {
+  top_signal: string | null
+  quote: string | null
+  tier: "act_now" | "watch" | "overdue" | "none"
+  days_of_lead_left: number | null
+  days_elapsed: number | null
+  lead_median: number | null
   overdue: boolean
   bookings_avg: number | null
   median_specialty_city: number | null
-  signal_at: string
+  signal_at: string | null
+  onboarding_grade: string | null
+  days_since_contact: number | null
+  action: "brief" | "draft" | "handoff" | "none" // brief = call, draft = message, handoff = route
+  play: string | null
+  status: string
 }
 
 export interface Watchlist {
@@ -101,9 +114,24 @@ export interface Specialist {
 }
 
 /** Precomputed in Python for one portfolio: the whole book, a team, or one specialist. */
+export interface CompareCell {
+  mine: number
+  ref: number
+  unit: "value" | "per100" // counts are compared per 100 active doctors
+  delta_pct: number | null
+}
+
 export interface Scope {
   periods: Record<string, KpiBlock>
   weekly_onboardings: WeeklyOnboarding[]
+  /** KPI key -> this scope against a reference: its team, the whole book, or the Mar–Jun baseline. */
+  compare: Partial<Record<"team" | "all" | "baseline", Record<string, CompareCell>>>
+}
+
+export interface RiskRules {
+  baseline_churn: number
+  cap: number
+  rules: { key: string; points: number; label: string; doctors: number; churn: number; lift: number }[]
 }
 
 export interface Rules {
@@ -183,6 +211,7 @@ export interface OverviewData {
   pulse: Pulse
   cost: Cost
   predict: Predict
+  risk: RiskRules
   watchlist: Watchlist
 }
 
@@ -233,7 +262,48 @@ export interface Dossier {
   top_signal_at: string | null
   top_signal_note: string | null
   bookings: { month: string; patient_bookings: number; admin_bookings: number }[]
-  contacts: { occurred_at: string; channel: string; direction: string; specialist_id: string; note: string | null }[]
+  // the full profile
+  segment: string | null
+  product: string | null
+  calendar_enabled_at: string | null
+  onboarding_days: number | null
+  onboarding_closed_at: string | null
+  bookings_last: number | null
+  bookings_prev: number | null
+  bookings_change_pct: number | null
+  bookings_peak: number | null
+  months_since_peak: number | null
+  admin_share: number | null
+  peer_gap: number | null
+  bottom_quartile: boolean | null
+  demand_constrained: boolean | null
+  calendar_hollow: boolean | null
+  last_contact: string | null
+  contacts_total: number | null
+  contacts_farming: number | null
+  campaigns_enrolled: number | null
+  campaigns_engaged: number | null
+  campaigns_60d: number | null
+  ignored_streak: number | null
+  responds_to: string | null
+  ignores: string | null
+  escalations: number | null
+  complaints: number | null
+  commitment_open: boolean | null
+  open_ask: string | null
+  days_commitment_open: number | null
+  upsell_signal: string | null
+  upsell_note: string | null
+  upsell_at: string | null
+  sig_churn_threat: boolean | null
+  sig_discouraged: boolean | null
+  sig_whatsapp_only: boolean | null
+  sig_gatekeeper: boolean | null
+  sig_multi_site: boolean | null
+  sig_billing_issue: boolean | null
+  unanswered_outbound: number | null
+  ever_replied: boolean | null
+  escalation_log: { escalated_at: string; specialist_id: string; minutes_to_pickup: number; converted: boolean }[]
   copilot: {
     mode: "draft" | "brief" | "handoff" | null
     play: string | null
@@ -292,3 +362,9 @@ export interface Pulse {
   bookings_monthly: { month: string; patient_bookings: number; doctors: number; per_doctor: number }[]
   note: string
 }
+
+/** One logged contact: [date, channel, direction, specialist id, note]. From doctors/chats/<owner>.json. */
+export type ChatRow = [string, string, string, string, string | null]
+
+/** doctor id -> [owner, name, specialty, city, status]. From doctors/index.json. */
+export type DoctorIndex = Record<string, [string, string, string, string, string]>

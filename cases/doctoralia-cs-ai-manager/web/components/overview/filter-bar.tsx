@@ -1,7 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import type { Filters, Role } from "@/lib/controls"
+import { COMPARE_LABEL, compareOptions, type Filters } from "@/lib/controls"
 import type { OverviewData } from "@/lib/types"
 
 const selectClass =
@@ -56,65 +56,60 @@ export function FilterBar({
   data,
   filters,
   onChange,
+  role,
 }: {
   data: OverviewData
   filters: Filters
   onChange: (patch: Partial<Filters>) => void
+  role: "manager" | "specialist"
 }) {
-  const setRole = (role: Role) =>
-    // A specialist always looks at one book; a manager starts from the whole portfolio.
-    onChange({ role, scope: role === "specialist" ? data.specialists[0].id : "all" })
-
+  const options = compareOptions(filters.scope)
   return (
     <div className="sticky top-0 z-20 -mx-4 flex flex-wrap items-end gap-x-4 gap-y-3 border-b border-border bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-      <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-muted-foreground">View as</span>
-        <Segmented
-          label="View as"
-          value={filters.role}
-          onChange={setRole}
-          options={[
-            { value: "manager", label: "Manager" },
-            { value: "specialist", label: "Specialist" },
-          ]}
-        />
-      </div>
-
-      <Field label={filters.role === "specialist" ? "My portfolio" : "Portfolio"}>
-        <select
-          className={selectClass}
-          value={filters.scope}
-          onChange={(e) => onChange({ scope: e.target.value })}
-        >
-          {filters.role === "manager" && (
-            <>
-              <option value="all">Whole portfolio</option>
-              <optgroup label="Teams">
-                {data.teams.map((t) => (
-                  <option key={t} value={`team:${t}`}>
-                    {t}
-                  </option>
-                ))}
-              </optgroup>
-            </>
-          )}
-          <optgroup label="Specialists">
-            {data.specialists.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} · {s.team.replace("Farming ", "")}
-              </option>
-            ))}
-          </optgroup>
-        </select>
-      </Field>
+      {role === "manager" ? (
+        <Field label="Portfolio">
+          <select
+            className={selectClass}
+            value={filters.scope}
+            onChange={(e) => {
+              const scope = e.target.value
+              // a comparison that does not exist for the new scope falls back to the previous period
+              onChange({ scope, compare: compareOptions(scope).includes(filters.compare) ? filters.compare : "prev" })
+            }}
+          >
+            <option value="all">Whole portfolio</option>
+            <optgroup label="Teams">
+              {data.teams.map((t) => (
+                <option key={t} value={`team:${t}`}>
+                  {t}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Specialists">
+              {data.specialists.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} · {s.team.replace("Farming ", "")}
+                </option>
+              ))}
+            </optgroup>
+          </select>
+        </Field>
+      ) : (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-muted-foreground">My book</span>
+          <span className="flex h-9 items-center text-sm font-medium text-foreground">
+            {data.specialists.find((s) => s.id === filters.scope)?.name ?? filters.scope}
+          </span>
+        </div>
+      )}
 
       <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-muted-foreground">Compare last</span>
+        <span className="text-xs font-medium text-muted-foreground">Compare with</span>
         <Segmented
-          label="Period"
-          value={filters.period}
-          onChange={(period) => onChange({ period })}
-          options={data.periods.map((p) => ({ value: String(p), label: `${p} days` }))}
+          label="Compare with"
+          value={filters.compare}
+          onChange={(compare) => onChange({ compare })}
+          options={options.map((c) => ({ value: c, label: COMPARE_LABEL[c] }))}
         />
       </div>
 

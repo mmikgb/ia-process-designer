@@ -43,6 +43,27 @@ PLAYS = [
                "Do not promise more patients. Promise the specific fix and a follow-up date."),
     ),
     dict(
+        # Before this play existed, a discouraged doctor fell through to whatever
+        # routine play matched next (usually a cheerful calendar message) while the
+        # watchlist was telling the specialist to act now. 2.3x churn lift, median
+        # 24 days of warning: worth a call, not a template.
+        key="discouraged", mode="brief",
+        when=lambda r: bool(r.sig_discouraged),
+        why="The doctor was noted as discouraged with their results. 15% of these churn, "
+            "2.3 times the baseline, and the note usually comes about 24 days before they leave.",
+        ask="call them this week and show them progress in their own numbers",
+        brief=("Call, do not template. Someone who feels it is not working reads a campaign "
+               "message as proof that nobody is looking.\n\n"
+               "Before you dial, have these three things:\n"
+               "  1. Their bookings: {last} last month, {avg:.0f} on average. "
+               "Median for {specialty} in {city} is {peer:.0f}.\n"
+               "  2. What was noted, on {when}: “{note}”\n"
+               "  3. One concrete change you can make together on the call, and when you "
+               "will check its effect.\n\n"
+               "Listen first. If their numbers are below peers, say so plainly and name the fix; "
+               "if they are not, show them that before anything else."),
+    ),
+    dict(
         key="open_commitment", mode="draft",
         when=lambda r: bool(r.commitment_open) and pd.notna(r.open_ask)
                        and (r.days_commitment_open or 0) >= 7,

@@ -140,6 +140,29 @@ series share a unit and sum to a total; amber for control signals, never unlabel
 
 ---
 
+### Added on 2026-10-05
+
+- **Roles.** "Viewing as" picks a manager or one specialist. A specialist gets My day,
+  Conversations and their own doctors' profiles; My team, Pulse, Control and Cost are
+  manager-only. Demo switch, not authentication.
+- **More calls, and a list that matches the count.** `draft.py` gained a call-brief play for
+  doctors noted as discouraged (2.3× churn, ~24 days of warning). Before, only "may cancel"
+  got a call: 226 of the ~790 high-risk doctors; now 298. The queue now holds every doctor
+  with a warning note plus every active doctor at risk ≥ 0.50 (1,107 rows), so the
+  "At risk" tab equals the "Doctors at risk" KPI (788).
+- **Send on WhatsApp** opens `wa.me` with the draft; the human sends. Marked as sent locally.
+- **How risk is estimated**: the weights now live in one table (`pipeline.RISK_WEIGHTS`),
+  exported to every place risk is shown. Scores are unchanged for all 5,571 doctors.
+- **Sortable tables**: the queue (with average monthly bookings vs peer median and last
+  contact) and both My team tables sort by any column.
+- **Compare with** replaces 30/60/90 days: previous 30 days, my team, whole portfolio, or the
+  frozen Mar–Jun baseline. Counts are compared per 100 active doctors. Computed in `kpi.py`.
+- **Conversations** screen and **doctor profile** page, from `out/doctors/chats/` and the
+  extended dossiers. The source holds the specialist's note of each contact, not the
+  messages; the screen says so.
+- **Bug fixed:** a cache hit did not rewrite `out/app_data.json`, so after a live rule change
+  and its revert, Streamlit kept showing the changed data.
+
 ## 6. Deviations from the plan, and why
 
 | Plan said | What happened | Reason |
@@ -176,10 +199,7 @@ Vercel, real clipboard permissions in Safari, and anything with the AI switched 
 
 ## 8. Known issues and open questions
 
-1. **No play for "discouraged" doctors.** `draft.py` has a call-brief play for "may cancel"
-   but none for "discouraged", so a discouraged doctor in "Act now" can get a cheerful
-   calendar-activation message. Adding a brief play is a product decision (and a good live
-   `PLAYS` change for the demo).
+1. ~~No play for "discouraged" doctors.~~ Added 2026-10-05 (call brief).
 2. **Hardcoded "30 minutes" in Streamlit copy** (`src/app.py` lines ~252–258, 336). The web
    app reads `RULES`; Streamlit does not.
 3. **Extract artefact:** zero onboardings started on days 29–31 of every month. Flagged on the
