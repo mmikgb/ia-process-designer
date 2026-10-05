@@ -4,7 +4,7 @@
 // exactly those doctors; then the follow-through from the outcome log (outcomes today and
 // this week, follow-ups overdue, drafts sent as written vs edited); then escalation pickup.
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { ExplainButton } from "@/components/ai/explain"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useClock } from "@/lib/clock"
@@ -56,8 +56,15 @@ export function TeamScreen({ team, teams, rules }: { team: Team; teams: string[]
   const { scope } = useIdentity()
   const clock = useClock()
   const [which, setWhich] = useState<string>("all")
+  // The scope arrives after the first paint; it sets the team only until the person picks one,
+  // so a click in that first moment is not undone when the identity loads.
+  const picked = useRef(false)
+  const pick = (x: string) => {
+    picked.current = true
+    setWhich(x)
+  }
   useEffect(() => {
-    if (scope.startsWith("team:")) setWhich(scope.slice(5))
+    if (!picked.current && scope.startsWith("team:")) setWhich(scope.slice(5))
   }, [scope])
   const rows = useMemo(() => team.rows.filter((r) => which === "all" || r.team === which), [team.rows, which])
   const minN = rules.min_n_rate ?? 10
@@ -125,7 +132,7 @@ export function TeamScreen({ team, teams, rules }: { team: Team; teams: string[]
               type="button"
               role="radio"
               aria-checked={which === x}
-              onClick={() => setWhich(x)}
+              onClick={() => pick(x)}
               className={cn(
                 "h-8 rounded-md px-3 text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                 which === x ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",

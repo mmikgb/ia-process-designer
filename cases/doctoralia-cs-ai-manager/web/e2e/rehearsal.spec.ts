@@ -69,20 +69,28 @@ test("rehearsal: a specialist's morning, the kill switch, the next day, a manage
   await page.keyboard.press("Escape")
   await page.keyboard.press("Escape")
 
-  // 7. kill switch off → the same screens, "IA apagada", deterministic drafts, nothing breaks
+  // 7. kill switch off → the same screens, "IA apagada", deterministic drafts, nothing breaks.
+  //    Costo IA is a manager screen, so the switch is flipped as Norte's manager.
+  const asRafael = await page.evaluate(() => localStorage.getItem("cs:who"))
+  const asManager = () => page.evaluate(() => localStorage.setItem("cs:who", '{"kind":"manager","team":"Farming Norte"}'))
+  const asSpecialist = () => page.evaluate((w) => localStorage.setItem("cs:who", w!), asRafael)
+  await asManager()
   await page.goto("/costo")
   const live = page.getByTestId("cost-live")
   await live.getByRole("switch").click()
   await expect(live).toContainText("IA apagada")
+  await asSpecialist()
   await page.goto("/hoy")
   await expect(page.getByText("IA apagada").first()).toBeVisible()
   await expect(page.getByText(/Versión automática/).first()).toBeVisible()
+  await asManager()
   await page.goto("/costo")
   await page.getByTestId("cost-live").getByRole("switch").click()
   await expect(page.getByTestId("cost-live")).not.toContainText("IA apagada")
 
   // 8. mark one "Sin respuesta", advance → it comes back under Seguimientos
   //    (no answer returns in 2 working days, so from Friday it takes two advances)
+  await asSpecialist()
   await page.goto("/hoy")
   await page.getByRole("button", { name: "Empezar" }).click()
   const noAnswer = await focus.locator("h3").first().innerText()

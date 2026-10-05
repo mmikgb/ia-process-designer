@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useClock } from "@/lib/clock"
 import { useLogFor } from "@/lib/day"
 import { loadDossier } from "@/lib/dossiers"
+import { RiskExplainer } from "@/components/doctor/risk-explainer"
 import { useT } from "@/lib/i18n"
 import type { Key } from "@/lib/i18n/es"
 import { useIdentity } from "@/lib/identity"
@@ -159,7 +160,10 @@ function SummaryTab({ doc }: { doc: Dossier }) {
   return (
     <div className="flex flex-col gap-5">
       <section className="flex flex-col gap-2">
-        <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{t("sheet.why")}</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{t("sheet.why")}</h3>
+          <RiskExplainer applied={doc.risk_reasons_i18n.map((r) => r.key)} />
+        </div>
         {doc.risk_reasons_i18n.length ? (
           <ul className="flex flex-col gap-1 text-sm text-foreground">
             {doc.risk_reasons_i18n.map((r) => (

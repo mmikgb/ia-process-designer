@@ -711,3 +711,42 @@ and what was corrected), `web/.env.example` (+`CS_OUT_DIR`). Streamlit's typed "
 - `e2e/integrations.spec.ts` covers both, with no key and with the mock. **Not verified: a real
   ElevenLabs call** (no key here). If the API answers "voice not found", add the voice to "My
   voices" in ElevenLabs or set `ELEVENLABS_VOICE_ID`.
+
+## 15. Merging `master` into `main` (2026-10-05)
+
+Two sessions worked from `39b4b27` at the same time: this branch (`main` / `feat/daily-tool`,
+54 commits) and `master` (one commit, `0947b81`: roles, call list, WhatsApp, compare,
+conversations and doctor profile, built on the old screens). `master` was written against
+files `main` had already replaced (the old worklist, site nav, controls), so a textual merge
+was not possible. `main` is the base; each of Miguel's eight asks was checked against it and
+only what was missing was ported, in `main`'s style (bilingual, Python decides):
+
+| Ask | On `main` already | Ported now |
+|---|---|---|
+| 1. Specialist view differs from manager | Identity, home `/hoy` vs `/resumen`, nav order | Specialists no longer see Mi equipo, Pulse, Control, Costo IA (sidebar and ⌘K); a typed URL shows "Esta pantalla es para managers" (`components/shell/managers-only.tsx`, `lib/nav.ts MANAGER_ONLY`) |
+| 2. Too few calls | `discouraged` brief play (T1.3) | — |
+| 3. WhatsApp button | §14 | Also in each conversation |
+| 4. How risk is estimated | Reasons per doctor | `pipeline.RISK_WEIGHTS` (risk() reads its points from it; all 5,571 scores and reasons identical before/after), bundled as `overview.risk`; "¿Cómo se calcula?" on the sheet's Resumen tab highlights the doctor's rules |
+| 5. Sortable columns, bookings a month | `/doctores` sorted by risk only | Every column sorts (`?sort=&dir=`, missing values last); new "Citas/mes · pares" column; `search.json` gains `b` and `pm` (964 KB, under the 1 MB gate) |
+| 6. Replace 30/60/90 | Period toggle on Resumen | `kpi.PERIODS = [30]` and "Comparar con": periodo anterior, mi equipo, toda la cartera, base mar–jun; counts per 100 active doctors; precomputed in `kpi.scopes()` (`compare`), also returned by the Ask drawer's `get_kpis` |
+| 7. Conversations, several at once | — | `/conversaciones`: inbox (search, "the doctor wrote last"), up to 3 chats side by side (`?open=`), a fourth closes the oldest, WhatsApp/copy with the copilot's draft; outcomes stay on the sheet |
+| 8. Full doctor profile | Doctor sheet v2 (4 tabs, addressable) | — |
+
+Tests changed with the behaviour, none removed: `test_kpi.py` loops over the periods that
+exist (one now) and adds a compare test; `test_bundle_web.py` allows the two new nullable
+search keys; `search.test.ts` decodes them; `rehearsal.spec.ts` flips the kill switch as
+Norte's manager (Costo IA is manager-only now); smoke and the Spanish sweep include
+`/conversaciones`. New `e2e/master-port.spec.ts` (6 tests). `WEB_SCHEMA` 6 → 7.
+
+One bug found on the way, not from the port: on Mi equipo, a team picked in the first moment
+was undone when the identity loaded (the scope effect overwrote it). `team.spec.ts` failed 1 run
+in 4 after the port shifted the timing (8 of 8 on untouched `main`). The scope now sets the team
+only until the person picks one; 8 of 8 after.
+
+Checks run: `python3 src/pipeline.py`, `python3 src/bundle.py`; `pytest tests/` 72 passed (the
+dayplan tests need a fresh `pipeline.py`: an `out/` from `master` made 4 fail until rebuilt);
+`pnpm test` 20 passed; `pnpm typecheck`; `pnpm build`; i18n 676 keys; `pnpm e2e` 27 passed with
+no key and 27 with `CS_AI_MOCK=1`. Screens looked at in Chromium at 1440 and 390, no page errors.
+
+The merge commit records `master` as merged with `-s ours`: its code is superseded by the
+port above, and keeping both would have left two worklists and two navs.

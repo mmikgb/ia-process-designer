@@ -1,8 +1,9 @@
 "use client"
 
 // Resumen, the manager's overview (T5.3). Every number comes from a block Python
-// precomputed for this scope and period; the browser only picks the block. The book comes
-// from the context switcher; the period is remembered per browser.
+// precomputed for this scope; the browser only picks the block. The book comes from the
+// context switcher; "Comparar con" picks a reference Python already compared against, and is
+// remembered per browser.
 import { useEffect, useState } from "react"
 import { AttentionList } from "@/components/overview/attention-list"
 import { HeroCard } from "@/components/overview/hero-card"
@@ -13,29 +14,36 @@ import { WatchlistContext } from "@/components/overview/watchlist-context"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useT } from "@/lib/i18n"
 import { useIdentity } from "@/lib/identity"
-import type { OverviewData } from "@/lib/types"
+import type { CompareRef, OverviewData } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
-const PERIOD = "cs:period"
+const COMPARE = "cs:compare"
+type Compare = "prev" | CompareRef
+
+/** The references a scope can be compared with: a specialist against their team and the book, a team against the book. */
+function compareOptions(scope: string): Compare[] {
+  if (scope === "all") return ["prev", "baseline"]
+  if (scope.startsWith("team:")) return ["prev", "all", "baseline"]
+  return ["prev", "team", "all", "baseline"]
+}
 
 export function Dashboard({ data }: { data: OverviewData }) {
   const { t, dayLong } = useT()
   const { scope: book, ready } = useIdentity()
-  const periods = data.periods.map(String)
-  const [period, setPeriod] = useState(String(data.kpi.window_days))
+  const period = String(data.kpi.window_days)
+  const [compare, setCompare] = useState<Compare>("prev")
   useEffect(() => {
     try {
-      const p = localStorage.getItem(PERIOD)
-      if (p && periods.includes(p)) setPeriod(p)
+      const c = localStorage.getItem(COMPARE) as Compare | null
+      if (c) setCompare(c)
     } catch {
-      // blocked storage: the default period
+      // blocked storage: the previous period
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  const pick = (p: string) => {
-    setPeriod(p)
+  const pick = (c: Compare) => {
+    setCompare(c)
     try {
-      localStorage.setItem(PERIOD, p)
+      localStorage.setItem(COMPARE, c)
     } catch {
       // the choice holds for this page
     }
@@ -57,28 +65,31 @@ export function Dashboard({ data }: { data: OverviewData }) {
 
   const scopeKey = data.scopes[book] ? book : "all"
   const scope = data.scopes[scopeKey]
-  const kpi = scope.periods[period] ?? scope.periods[String(data.kpi.window_days)]
+  const kpi = scope.periods[period] ?? Object.values(scope.periods)[0]
+  const options = compareOptions(scopeKey)
+  // a reference this scope does not have (a team has no team) falls back to the previous period
+  const ref: Compare = options.includes(compare) ? compare : "prev"
 
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">{t("summary.window", { n: kpi.window_days, date: dayLong(kpi.asof) })}</p>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground">{t("summary.period")}</span>
-          <div role="radiogroup" aria-label={t("summary.period")} className="inline-flex rounded-lg border border-input bg-card p-0.5">
-            {periods.map((p) => (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">{t("summary.compare")}</span>
+          <div role="radiogroup" aria-label={t("summary.compare")} className="inline-flex flex-wrap rounded-lg border border-input bg-card p-0.5">
+            {options.map((c) => (
               <button
-                key={p}
+                key={c}
                 type="button"
                 role="radio"
-                aria-checked={period === p}
-                onClick={() => pick(p)}
+                aria-checked={ref === c}
+                onClick={() => pick(c)}
                 className={cn(
                   "h-8 rounded-md px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                  period === p ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+                  ref === c ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                {t("summary.period.days", { n: p })}
+                {t(`summary.compare.${c}`)}
               </button>
             ))}
           </div>
@@ -87,7 +98,13 @@ export function Dashboard({ data }: { data: OverviewData }) {
 
       <HeroCard healthScore={kpi.health_score} healthNote={kpi.health_note} totals={kpi.totals} />
 
-      <KpiGrid kpis={kpi.kpis} scope={scopeKey} period={period} />
+      <KpiGrid
+        kpis={kpi.kpis}
+        scope={scopeKey}
+        period={period}
+        compare={ref === "prev" ? null : (scope.compare?.[ref] ?? {})}
+        refLabel={t(`summary.compare.${ref}`)}
+      />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
         <div className="lg:col-span-3">

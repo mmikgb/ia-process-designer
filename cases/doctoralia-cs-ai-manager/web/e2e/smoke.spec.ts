@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test"
 
 // T6.1: every screen, both roles, both languages: it renders, nothing throws, and the page
 // never scrolls sideways (tables scroll inside their cards). Runs at 1440 light and 390 dark.
-const SCREENS = ["/hoy", "/doctores", "/senales", "/resumen", "/equipo", "/pulse", "/control", "/costo"]
+const SCREENS = ["/hoy", "/doctores", "/conversaciones", "/senales", "/resumen", "/equipo", "/pulse", "/control", "/costo"]
 
 for (const locale of ["es", "en"]) {
   for (const [who, role] of [

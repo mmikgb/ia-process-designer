@@ -10,7 +10,7 @@ import { PALETTE_EVENT } from "@/components/shell/top-bar"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { useT } from "@/lib/i18n"
 import { useIdentity } from "@/lib/identity"
-import { NAV } from "@/lib/nav"
+import { MANAGER_ONLY, NAV } from "@/lib/nav"
 import { fold, loadSearch, matchDoctors } from "@/lib/search"
 import { useShell } from "@/lib/shell"
 import type { SearchRow } from "@/lib/types"
@@ -64,7 +64,9 @@ export function CommandPalette() {
   const doctors = rows ? matchDoctors(rows, query, owner) : []
   const ownerName = (id: string) => shell.specialists.find((s) => s.id === id)?.name ?? id
   const q = fold(query)
-  const screens = NAV.filter((n) => !q || fold(t(n.label)).includes(q))
+  const screens = NAV.filter(
+    (n) => !(who?.kind === "specialist" && MANAGER_ONLY.includes(n.href)) && (!q || fold(t(n.label)).includes(q)),
+  )
   const actions = [
     { key: "start", label: t("palette.start"), icon: CalendarCheck, fn: () => {
       router.push("/hoy")

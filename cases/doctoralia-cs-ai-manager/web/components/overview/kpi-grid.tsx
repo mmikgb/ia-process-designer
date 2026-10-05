@@ -10,20 +10,41 @@ import { Card } from "@/components/ui/card"
 import { formatDeltaPct, isGoodDelta, pyFormat } from "@/lib/format"
 import { useT } from "@/lib/i18n"
 import { KPI_FLAG, listHref } from "@/lib/lists"
-import type { KpiItem } from "@/lib/types"
+import type { CompareCell, KpiItem } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
-export function KpiGrid({ kpis, scope = "all", period = "30" }: { kpis: KpiItem[]; scope?: string; period?: string }) {
+type Props = {
+  kpis: KpiItem[]
+  scope?: string
+  period?: string
+  /** null: against the previous period (the KPI's own delta); else the precomputed comparison. */
+  compare?: Record<string, CompareCell> | null
+  refLabel?: string
+}
+
+export function KpiGrid({ kpis, scope = "all", period = "30", compare = null, refLabel = "" }: Props) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {kpis.map((kpi) => (
-        <KpiCard key={kpi.key} kpi={kpi} scope={scope} period={period} />
+        <KpiCard key={kpi.key} kpi={kpi} scope={scope} period={period} compare={compare} refLabel={refLabel} />
       ))}
     </div>
   )
 }
 
-function KpiCard({ kpi, scope, period }: { kpi: KpiItem; scope: string; period: string }) {
+function KpiCard({
+  kpi,
+  scope,
+  period,
+  compare,
+  refLabel,
+}: {
+  kpi: KpiItem
+  scope: string
+  period: string
+  compare: Record<string, CompareCell> | null
+  refLabel: string
+}) {
   const { t, tx } = useT()
   const hasDelta = kpi.delta_pct != null && !kpi.suppressed
   const up = hasDelta && kpi.delta_pct! > 0
@@ -68,7 +89,9 @@ function KpiCard({ kpi, scope, period }: { kpi: KpiItem; scope: string; period: 
           </div>
         )}
       </div>
-      {hasDelta && (
+      {compare ? (
+        <CompareLine cell={compare[kpi.key]} kpi={kpi} refLabel={refLabel} />
+      ) : hasDelta && (
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span
             className={cn(
@@ -84,5 +107,35 @@ function KpiCard({ kpi, scope, period }: { kpi: KpiItem; scope: string; period: 
       )}
       <p className="text-xs text-muted-foreground text-pretty">{tx(kpi.suppressed ?? kpi.note)}</p>
     </Card>
+  )
+}
+
+/** This scope against the picked reference. Counts are shown per 100 active doctors, so a
+ * 380-doctor book and the whole portfolio are on one scale. Python computed both sides. */
+function CompareLine({ cell, kpi, refLabel }: { cell: CompareCell | undefined; kpi: KpiItem; refLabel: string }) {
+  const { t } = useT()
+  if (!cell) return <p className="text-xs text-muted-foreground">{t("summary.compare.none")}</p>
+  const fmt = (v: number) => (cell.unit === "per100" ? v.toFixed(1) : pyFormat(v, kpi.fmt))
+  const d = cell.delta_pct
+  const good = d != null && d !== 0 && isGoodDelta(d, kpi.good)
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      {d != null && (
+        <span
+          className={cn(
+            "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold tabular-nums",
+            d === 0 ? "bg-muted text-muted-foreground" : good ? "bg-chip-green text-chip-green-fg" : "bg-chip-red text-chip-red-fg",
+          )}
+        >
+          {d > 0 ? <ArrowUpRight className="size-3" aria-hidden /> : d < 0 ? <ArrowDownRight className="size-3" aria-hidden /> : null}
+          {formatDeltaPct(d)}
+        </span>
+      )}
+      <span className="text-muted-foreground">
+        {t("summary.compare.vs", { ref: refLabel })} ·{" "}
+        <span className="tabular-nums">{t("summary.compare.cell", { mine: fmt(cell.mine), ref: fmt(cell.ref) })}</span>
+        {cell.unit === "per100" && ` ${t("summary.compare.per100")}`}
+      </span>
+    </div>
   )
 }

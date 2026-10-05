@@ -30,7 +30,7 @@ for (const [who, id] of [
       localStorage.setItem("cs:locale", "es")
     }, who)
     const hits: string[] = []
-    for (const path of ["/hoy", "/doctores", "/senales", "/resumen", "/equipo", "/pulse", "/control", "/costo", "/hoy?doctor=D01184"]) {
+    for (const path of ["/hoy", "/doctores", "/conversaciones?open=D01184", "/senales", "/resumen", "/equipo", "/pulse", "/control", "/costo", "/hoy?doctor=D01184"]) {
       hits.push(...(await englishOn(page, path)))
     }
     expect(hits).toEqual([])

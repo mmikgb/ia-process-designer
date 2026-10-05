@@ -36,8 +36,10 @@ def test_search_has_every_doctor_and_short_keys(files):
     assert len(search) == len(dossiers) == 5571
     required = {"i", "n", "s", "c", "o", "p", "m", "r", "f"}
     optional = {"st", "lc", "fu", "a"}    # left out when empty ("st" when active)
-    assert all(required <= set(x) <= required | optional for x in search)
+    nullable = {"b", "pm"}                # bookings a month and the peer median: left out when unknown, 0 is real
+    assert all(required <= set(x) <= required | optional | nullable for x in search)
     assert all(x[k] not in (None, 0) for x in search for k in optional if k in x)
+    assert all(x[k] is not None for x in search for k in nullable if k in x)
     assert {x.get("st", "active") for x in search} == {"active", "churned"}
     assert not any(x.get("st") == "active" for x in search)
     assert (OUT / "search.json").stat().st_size < 1_000_000

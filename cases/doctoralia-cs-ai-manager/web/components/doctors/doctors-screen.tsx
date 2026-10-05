@@ -8,7 +8,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { Download, Search, X } from "lucide-react"
+import { ArrowDown, ArrowUp, ChevronsUpDown, Download, Search, X } from "lucide-react"
 import { doctorHref } from "@/components/shell/doctor-sheet-host"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -22,6 +22,16 @@ import { FLAG_BITS, SIGNAL_BITS, type Flag, type SearchRow } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 const PAGE = 100
+
+// Sortable columns, kept in the URL (?sort=bookings&dir=asc) so a sorted list can be shared.
+// Missing values always sort last, whichever way the column is ordered.
+type SortKey = "name" | "owner" | "play" | "risk" | "bookings" | "contact" | "followup"
+const SORTS: SortKey[] = ["name", "owner", "play", "risk", "bookings", "contact", "followup"]
+function cmp(a: number | string | null, b: number | string | null, asc: boolean): number {
+  if (a == null || b == null) return a == null && b == null ? 0 : a == null ? 1 : -1
+  const r = typeof a === "string" ? a.localeCompare(String(b), "es") : a - (b as number)
+  return asc ? r : -r
+}
 const BAND_TONE: Record<string, string> = {
   healthy: "bg-chip-green text-chip-green-fg",
   watch: "bg-muted text-muted-foreground",
@@ -57,6 +67,8 @@ function useFilters() {
       q: p.get("q") ?? "",
       all: p.get("scope") === "all",
       status: status === "churned" || status === "all" ? status : "active",
+      sort: (SORTS as string[]).includes(p.get("sort") ?? "") ? (p.get("sort") as SortKey) : null,
+      asc: p.get("dir") === "asc",
     }
   }, [p])
 }
@@ -121,8 +133,23 @@ function Doctors() {
         (!f.city || fold(r.city).includes(fold(f.city))) &&
         (!words.length || words.every((w) => fold(`${r.name} ${r.id} ${r.specialty} ${r.city}`).includes(w))),
     )
-    return out.sort((a, b) => b.risk - a.risk || a.name.localeCompare(b.name))
-  }, [rows, f, book, bands, teamOf])
+    const plays = new Map(shell.plays.map((p, n) => [p.key, n]))
+    const value = (r: SearchRow, k: SortKey): number | string | null => {
+      switch (k) {
+        case "name": return r.name
+        case "owner": return nameOf.get(r.owner) ?? r.owner
+        case "play": return r.play ? (plays.get(r.play) ?? 99) : null // the copilot's priority order
+        case "risk": return r.risk
+        case "bookings": return r.bookings
+        case "contact": return r.lastContact
+        case "followup": return r.followup
+      }
+    }
+    const k = f.sort
+    return out.sort(
+      (a, b) => (k ? cmp(value(a, k), value(b, k), f.asc) : 0) || b.risk - a.risk || a.name.localeCompare(b.name),
+    )
+  }, [rows, f, book, bands, teamOf, nameOf, shell.plays])
 
   const set = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(params.toString())
@@ -170,13 +197,13 @@ function Doctors() {
 
   const exportCsv = () => {
     if (!filtered) return
-    const head = ["doctor_id", "doctor", "specialty", "city", "owner", "status", "play", "risk", "risk_band", "days_since_contact", "followup_in_days", "flags", "signals"]
+    const head = ["doctor_id", "doctor", "specialty", "city", "owner", "status", "play", "risk", "risk_band", "days_since_contact", "followup_in_days", "bookings_month", "peer_median", "flags", "signals"]
     const cell = (v: unknown) => {
       const s = v == null ? "" : String(v)
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
     }
     const lines = filtered.map((r) =>
-      [r.id, r.name, r.specialty, r.city, r.owner, r.status, r.play, r.risk, bandOf(r.risk), r.lastContact == null ? null : r.lastContact + clock.offset, r.followup == null ? null : r.followup - clock.offset, r.flags.join(" "), r.signals.join(" ")]
+      [r.id, r.name, r.specialty, r.city, r.owner, r.status, r.play, r.risk, bandOf(r.risk), r.lastContact == null ? null : r.lastContact + clock.offset, r.followup == null ? null : r.followup - clock.offset, r.bookings, r.peers, r.flags.join(" "), r.signals.join(" ")]
         .map(cell)
         .join(","),
     )
@@ -296,16 +323,17 @@ function Doctors() {
         <Card className="items-center py-12 text-sm text-muted-foreground">{t("doctors.empty")}</Card>
       ) : (
         <Card className="gap-0 overflow-x-auto py-0">
-          <table className="w-full min-w-[860px] text-sm">
+          <table className="w-full min-w-[960px] text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                <th className="px-4 py-2.5 font-medium">{t("doctors.col.doctor")}</th>
+                <SortTh col="name" label={t("doctors.col.doctor")} f={f} set={set} className="px-4" />
                 <th className="px-3 py-2.5 font-medium">{t("doctors.col.where")}</th>
-                {!specialist && <th className="px-3 py-2.5 font-medium">{t("doctors.col.owner")}</th>}
-                <th className="px-3 py-2.5 font-medium">{t("doctors.col.play")}</th>
-                <th className="px-3 py-2.5 font-medium">{t("doctors.col.risk")}</th>
-                <th className="px-3 py-2.5 font-medium">{t("doctors.col.contact")}</th>
-                <th className="px-4 py-2.5 font-medium">{t("doctors.col.followup")}</th>
+                {!specialist && <SortTh col="owner" label={t("doctors.col.owner")} f={f} set={set} />}
+                <SortTh col="play" label={t("doctors.col.play")} f={f} set={set} />
+                <SortTh col="risk" label={t("doctors.col.risk")} f={f} set={set} />
+                <SortTh col="bookings" label={t("doctors.col.bookings")} title={t("doctors.col.bookings.title")} f={f} set={set} />
+                <SortTh col="contact" label={t("doctors.col.contact")} f={f} set={set} />
+                <SortTh col="followup" label={t("doctors.col.followup")} f={f} set={set} className="px-4" />
               </tr>
             </thead>
             <tbody data-testid="doctors-rows">
@@ -341,6 +369,14 @@ function Doctors() {
                         {t(`band.${band}` as Key)} · {num(r.risk, 2)}
                       </span>
                     </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap tabular-nums">
+                      {r.bookings == null ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <span className={cn(r.peers != null && r.bookings < r.peers ? "text-warning" : "text-foreground")}>{num(r.bookings, 1)}</span>
+                      )}
+                      {r.peers != null && <span className="text-muted-foreground"> · {num(r.peers, 1)}</span>}
+                    </td>
                     <td className="px-3 py-2.5 text-muted-foreground tabular-nums">{contact(r.lastContact)}</td>
                     <td className={cn("px-4 py-2.5 tabular-nums", fu?.late ? "text-warning" : "text-muted-foreground")}>{fu?.text ?? "—"}</td>
                   </tr>
@@ -358,6 +394,46 @@ function Doctors() {
         </Card>
       )}
     </div>
+  )
+}
+
+/** A header that sorts by its column: first click descending (risk, bookings) or ascending
+ * (text, days), a second click flips it. */
+function SortTh({
+  col,
+  label,
+  title,
+  f,
+  set,
+  className,
+}: {
+  col: SortKey
+  label: string
+  title?: string
+  f: { sort: SortKey | null; asc: boolean }
+  set: (patch: Record<string, string | null>) => void
+  className?: string
+}) {
+  const { t } = useT()
+  const on = f.sort === col
+  const firstAsc = col === "name" || col === "owner" || col === "play" || col === "followup"
+  const asc = on ? !f.asc : firstAsc
+  const Icon = on ? (f.asc ? ArrowUp : ArrowDown) : ChevronsUpDown
+  return (
+    <th className={cn("px-3 py-2.5 font-medium", className)} aria-sort={on ? (f.asc ? "ascending" : "descending") : "none"} title={title}>
+      <button
+        type="button"
+        onClick={() => set({ sort: col, dir: asc ? "asc" : "desc" })}
+        aria-label={t("doctors.sort", { col: label })}
+        className={cn(
+          "inline-flex items-center gap-1 rounded whitespace-nowrap hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+          on && "text-foreground",
+        )}
+      >
+        {label}
+        <Icon className="size-3" aria-hidden />
+      </button>
+    </th>
   )
 }
 

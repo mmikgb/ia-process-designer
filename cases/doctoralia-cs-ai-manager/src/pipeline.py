@@ -289,6 +289,29 @@ LIFT = {
 BASELINE_CHURN = 0.066
 
 
+# The points risk() adds, one row per rule: (points, LIFT key or None, what it means).
+# risk() reads its weights from here and the web's "¿Cómo se calcula?" table is built from
+# this dict, so the explanation can never disagree with the score.
+RISK_WEIGHTS = {
+    "churn_threat":    (0.50, "churn_threat", L("Said they would cancel or are comparing platforms",
+                                                "Dijo que cancelaría o está comparando plataformas")),
+    "discouraged":     (0.25, "discouraged", L("Noted as discouraged with results (only without a cancel threat)",
+                                               "Anotado como desanimado (solo si no amenazó con cancelar)")),
+    "grade_d":         (0.30, "grade_D", L("Closed onboarding at grade D", "Cerró el onboarding en grado D")),
+    "grade_c":         (0.10, "grade_C", L("Closed onboarding at grade C", "Cerró el onboarding en grado C")),
+    "bottom_quartile": (0.20, "bottom_quartile", L("Bottom quartile of bookings for their specialty and city",
+                                                   "Cuartil inferior de citas en su especialidad y ciudad")),
+    "calendar_off":    (0.18, "calendar_off", L("Online calendar never turned on", "Nunca activó la agenda en línea")),
+    "complaint":       (0.12, "complaint", L("Complained about patient volume or no-shows",
+                                             "Se quejó por volumen de pacientes o ausentismo")),
+    "calendar_hollow": (0.08, "calendar_hollow", L("Calendar on, too few slots published",
+                                                   "Agenda encendida con muy pocos horarios")),
+    "ignored_streak":  (0.05, "ignored_streak", L("Ignored the last 3 or more campaigns in a row",
+                                                  "Ignoró 3 o más campañas seguidas")),
+}
+W = {k: v[0] for k, v in RISK_WEIGHTS.items()}
+
+
 def _churn(key: str) -> str:
     """A signal's churn rate as quoted in a reason, read from LIFT, never typed by hand."""
     return pct(LIFT[key][1])
@@ -311,48 +334,48 @@ def risk(r) -> tuple[float, list[dict]]:
     # in the file by a factor of two, and it lived in free text nobody queried.
     if r.sig_churn_threat:
         c = _churn("churn_threat")
-        add(0.50, "churn_threat",
+        add(W["churn_threat"], "churn_threat",
             f"said they would cancel or are comparing platforms ({c} of these churn)",
             f"dijo que cancelaría o está comparando plataformas ({c} de estos se van)")
     elif r.sig_discouraged:
         c = _churn("discouraged")
-        add(0.25, "discouraged", f"noted as discouraged with results ({c} churn)",
+        add(W["discouraged"], "discouraged", f"noted as discouraged with results ({c} churn)",
             f"anotado como desanimado con los resultados ({c} se van)")
 
     if r.complaints >= 1:
         n = int(r.complaints)
-        add(0.12, "complaint", f"{n} complaint(s) logged about patient volume or no-shows",
+        add(W["complaint"], "complaint", f"{n} complaint(s) logged about patient volume or no-shows",
             f"{n} queja(s) registrada(s) por volumen de pacientes o ausentismo")
 
     # How they start predicts how they end.
     if r.onboarding_grade == "D":
         c = _churn("grade_D")
-        add(0.30, "grade_d", f"closed onboarding at grade D ({c} churn)",
+        add(W["grade_d"], "grade_d", f"closed onboarding at grade D ({c} churn)",
             f"cerró el onboarding en grado D ({c} se van)")
     elif r.onboarding_grade == "C":
-        add(0.10, "grade_c", "closed onboarding at grade C", "cerró el onboarding en grado C")
+        add(W["grade_c"], "grade_c", "closed onboarding at grade C", "cerró el onboarding en grado C")
 
     # The activation step that matters.
     if not r.calendar_enabled:
         c = _churn("calendar_off")
-        add(0.18, "calendar_off", f"online calendar never turned on ({c} churn)",
+        add(W["calendar_off"], "calendar_off", f"online calendar never turned on ({c} churn)",
             f"nunca activó la agenda en línea ({c} se van)")
     elif r.calendar_hollow:
         n = int(r.weekly_slots_published)
-        add(0.08, "calendar_hollow", f"calendar on but only {n} slots published",
+        add(W["calendar_hollow"], "calendar_hollow", f"calendar on but only {n} slots published",
             f"agenda encendida pero solo {n} {'horario publicado' if n == 1 else 'horarios publicados'}")
 
     # Against their own peers, not against the platform average.
     if r.bottom_quartile and pd.notna(r.median_specialty_city):
         avg, peer = f"{r.bookings_avg:.0f}", f"{r.median_specialty_city:.0f}"
-        add(0.20, "bottom_quartile",
+        add(W["bottom_quartile"], "bottom_quartile",
             f"bottom quartile for {r.specialty} in {r.city} ({avg}/mo vs {peer} median)",
             f"cuartil inferior de {str(r.specialty).lower()} en {r.city} "
             f"({avg}/mes vs mediana {peer})")
 
     if r.ignored_streak >= 3:
         n = int(r.ignored_streak)
-        add(0.05, "ignored_streak", f"ignored the last {n} campaigns in a row",
+        add(W["ignored_streak"], "ignored_streak", f"ignored the last {n} campaigns in a row",
             f"ignoró las últimas {n} campañas seguidas")
 
     return round(min(pts, 1.0), 2), why

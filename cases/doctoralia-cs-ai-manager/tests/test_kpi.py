@@ -47,7 +47,7 @@ def test_overview_note_and_team_screen_agree_on_conversion(b):
     fast = next(x for x in b["team"]["buckets"] if x["bucket"] == "<30m")["converted"]
     figure = f"{100 * fast:.0f}%"
     for scope in ["all", "S01", "S10"]:
-        for period in ["30", "90"]:
+        for period in b["scopes"][scope]["periods"]:  # one window since "Comparar con" replaced 30/60/90
             k = {x["key"]: x for x in b["scopes"][scope]["periods"][period]["kpis"]}
             note = k["conversion"]["note"]
             assert note["en"].startswith(figure) and note["es"].startswith(figure)
@@ -60,3 +60,22 @@ def test_labels_and_notes_are_bilingual_and_quote_rules(b):
     assert str(RULES["escalation_pickup_target_min"]) in k["sla"]["label"]["es"]
     assert str(RULES["calendar_healthy_slots"]) in k["hollow"]["note"]["es"]
     assert not re.search(r"\b54%", json.dumps(b["kpi"]))
+
+
+def test_compare_is_per_100_for_counts_and_agrees_with_the_blocks(b):
+    # "Comparar con": a specialist against their team, the book and the baseline; a team has no team
+    s01, sc = b["scopes"]["S01"], b["scopes"]
+    assert set(s01["compare"]) == {"team", "all", "baseline"}
+    assert "team" not in next(v for k, v in sc.items() if k.startswith("team:"))["compare"]
+    assert set(sc["all"]["compare"]) == {"baseline"}
+    k = {x["key"]: x for x in s01["periods"]["30"]["kpis"]}
+    act = s01["periods"]["30"]["totals"]["active"]
+    cell = s01["compare"]["all"]["at_risk"]
+    assert cell["unit"] == "per100" and cell["mine"] == round(100 * k["at_risk"]["value"] / act, 2)
+    assert s01["compare"]["all"]["grade_d"]["unit"] == "value"
+    # baseline compares rates only; a withheld rate is never compared
+    assert set(s01["compare"]["baseline"]) <= RATES | {"onb_score"}
+    for scope in sc.values():
+        for ref in scope["compare"].values():
+            for key, c in ref.items():
+                assert c["mine"] is not None and c["ref"] is not None, key

@@ -1,5 +1,6 @@
 import { PulseScreen } from "@/components/pulse/pulse-screen"
 import { Framed } from "@/components/screens/simple"
+import { ManagersOnly } from "@/components/shell/managers-only"
 import overview from "@/data/overview.json"
 import type { OverviewData } from "@/lib/types"
 
@@ -10,7 +11,9 @@ export const metadata = { title: "Pulse · CS Control Room" }
 export default function Page() {
   return (
     <Framed title="nav.pulse" subtitle="pulse.subtitle">
-      <PulseScreen pulse={data.pulse} />
+      <ManagersOnly>
+        <PulseScreen pulse={data.pulse} />
+      </ManagersOnly>
     </Framed>
   )
 }

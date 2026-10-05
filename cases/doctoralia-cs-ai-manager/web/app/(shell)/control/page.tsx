@@ -1,5 +1,6 @@
 import { ControlScreen } from "@/components/control/control-screen"
 import { Framed } from "@/components/screens/simple"
+import { ManagersOnly } from "@/components/shell/managers-only"
 import overview from "@/data/overview.json"
 import type { OverviewData } from "@/lib/types"
 
@@ -10,7 +11,9 @@ export const metadata = { title: "Control · CS Control Room" }
 export default function Page() {
   return (
     <Framed title="nav.control" subtitle="control.subtitle">
-      <ControlScreen spc={data.spc} buckets={data.team.buckets} asof={data.meta.asof ?? data.meta.extract_date} />
+      <ManagersOnly>
+        <ControlScreen spc={data.spc} buckets={data.team.buckets} asof={data.meta.asof ?? data.meta.extract_date} />
+      </ManagersOnly>
     </Framed>
   )
 }

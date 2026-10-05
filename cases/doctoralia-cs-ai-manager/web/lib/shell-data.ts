@@ -12,6 +12,7 @@ export interface ShellData {
   books: Record<string, { active: number; atRisk: number }>
   plays: { key: string; mode: string; label: I18n }[]
   ai: { enabled: boolean; reason: I18n | string }
+  risk: OverviewData["risk"] | null
 }
 
 export function shellData(o: OverviewData): ShellData {
@@ -30,6 +31,7 @@ export function shellData(o: OverviewData): ShellData {
     books,
     plays: o.meta.plays ?? [],
     ai: { enabled: o.cost.enabled, reason: o.cost.reason },
+    risk: o.risk ?? null,
   }
 }
 

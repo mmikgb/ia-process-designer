@@ -115,9 +115,21 @@ export interface Specialist {
 }
 
 /** Precomputed in Python for one portfolio: the whole book, a team, or one specialist. */
+/** One KPI of this scope against a reference, precomputed in kpi.py scopes(). */
+export interface CompareCell {
+  mine: number
+  ref: number
+  unit: "value" | "per100" // counts are compared per 100 active doctors
+  delta_pct: number | null
+}
+
+export type CompareRef = "team" | "all" | "baseline"
+
 export interface Scope {
   periods: Record<string, KpiBlock>
   weekly_onboardings: WeeklyOnboarding[]
+  /** KPI key -> this scope against its team, the whole book, or the Mar–Jun baseline. */
+  compare?: Partial<Record<CompareRef, Record<string, CompareCell>>>
 }
 
 export interface Rules {
@@ -205,7 +217,15 @@ export interface Theme {
   examples: string[]
 }
 
+/** How the risk score is built: the table pipeline.risk() adds up (RISK_WEIGHTS). */
+export interface RiskRules {
+  baseline_churn: number
+  cap: number
+  rules: { key: string; points: number; label: I18n; doctors: number; churn: number; lift: number }[]
+}
+
 export interface OverviewData {
+  risk: RiskRules
   meta: Meta
   rules: Rules
   kpi: KpiBlock
@@ -365,6 +385,8 @@ export interface SearchRowRaw {
   lc?: number // days since the last contact, at the data date; absent = never
   fu?: number // days until the open follow-up is due (negative = overdue); absent = none
   a?: number // attention signals, bit n = SIGNAL_BITS[n]; absent = none
+  b?: number // patient bookings a month, on average; absent = no bookings history
+  pm?: number // median of the same specialty and city; absent = no peers
 }
 export interface SearchRow {
   id: string; name: string; specialty: string; city: string
@@ -374,6 +396,8 @@ export interface SearchRow {
   lastContact: number | null
   followup: number | null
   signals: string[]
+  bookings: number | null
+  peers: number | null
 }
 // The bit orders, copied from src/dayplan.py FLAGS and src/kpi.py ATTENTION (overview.json
 // meta.flag_bits / meta.signal_bits); tests/search.test.ts fails if they drift.
@@ -387,6 +411,7 @@ export const searchRow = (x: SearchRowRaw): SearchRow => ({
   id: x.i, name: x.n, specialty: x.s, city: x.c, owner: x.o, status: x.st ?? "active",
   play: x.p, mode: x.m, risk: x.r, flags: bits(x.f, FLAG_BITS),
   lastContact: x.lc ?? null, followup: x.fu ?? null, signals: bits(x.a, SIGNAL_BITS),
+  bookings: x.b ?? null, peers: x.pm ?? null,
 })
 
 export interface TeamRow {

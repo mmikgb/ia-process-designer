@@ -30,7 +30,7 @@ SCHEMA_VERSION = "1.2"
 # The shape of the web view (overview.json, queue/, doctors/, search.json). Bump it whenever
 # the web app starts to need a field; web/scripts/sync-data.mjs refuses to copy an out/ with
 # a lower number over the committed data (a stale out/ used to break /costo silently).
-WEB_SCHEMA = 6
+WEB_SCHEMA = 7
 
 REQUIRED = {
     "doctors": ["doctor_id", "signup_date", "status", "owner_specialist_id",
@@ -248,6 +248,11 @@ def web_view(b: dict, top: int = 12) -> dict:
         # Control charts are portfolio-wide by design: a 400-doctor book has too
         # few points a day to hold limits.
         "spc": b["spc"],
+        # How the risk score is built: the table risk() adds up, with each rule's measured churn
+        "risk": {"baseline_churn": P.BASELINE_CHURN, "cap": 1.0,
+                 "rules": [{"key": k, "points": w, "label": label,
+                            "doctors": P.LIFT[lk][0], "churn": P.LIFT[lk][1], "lift": P.LIFT[lk][2]}
+                           for k, (w, lk, label) in P.RISK_WEIGHTS.items()]},
         "team": b["team"],
         "pulse": b["pulse"],
         # What the AI layer would cost, and whether it is on. Live spend is in the
@@ -374,7 +379,16 @@ def dossiers(b: dict, doc: pd.DataFrame, copilot: dict, flags: dict) -> dict[str
 # Short keys keep search.json under 1 MB; the mapping is SearchRowRaw in web/lib/types.ts.
 SEARCH_KEYS = {"id": "i", "name": "n", "specialty": "s", "city": "c", "owner": "o",
                "status": "st", "play": "p", "mode": "m", "risk": "r", "flags": "f",
-               "last_contact": "lc", "followup": "fu", "signals": "a"}
+               "last_contact": "lc", "followup": "fu", "signals": "a",
+               "bookings": "b", "peers": "pm"}
+
+
+def _r1(v):
+    """One decimal, a whole number without its .0 (smaller file); None when missing."""
+    if v is None or pd.isna(v):
+        return None
+    x = round(float(v), 1)
+    return int(x) if x == int(x) else x
 
 
 def search_rows(doc: pd.DataFrame, copilot: dict, flags: dict) -> list[dict]:
@@ -401,13 +415,17 @@ def search_rows(doc: pd.DataFrame, copilot: dict, flags: dict) -> list[dict]:
              "risk": _num(r.risk_score),
              "flags": sum(1 << dayplan.FLAGS.index(f) for f in flags[r.doctor_id]),
              "last_contact": days(r.last_contact, -1), "followup": days(r.followup_due_at, 1),
-             "signals": signals[r.doctor_id]}
+             "signals": signals[r.doctor_id],
+             # patient bookings a month, and the median of the same specialty and city
+             "bookings": _r1(r.bookings_avg), "peers": _r1(r.median_specialty_city)}
             for _, r in doc.iterrows()]
     # the three optional fields are left out when empty: the file is read on every screen
     # "st" is written only for churned doctors (absent = active).
     optional = {"last_contact", "followup", "signals"}
+    nullable = {"bookings", "peers"}
     return [{SEARCH_KEYS[k]: v for k, v in x.items()
-             if not (k in optional and v in (None, 0)) and not (k == "status" and v == "active")}
+             if not (k in optional and v in (None, 0)) and not (k in nullable and v is None)
+             and not (k == "status" and v == "active")}
             for x in rows]
 
 

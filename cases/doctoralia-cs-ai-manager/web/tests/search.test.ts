@@ -22,6 +22,10 @@ test("searchRow decodes flags, signals, status and the day offsets", () => {
   assert.equal(c.status, "churned")
   assert.deepEqual(c.flags, [])
   assert.equal(c.lastContact, null)
+  assert.equal(c.bookings, null)
+  const b = searchRow({ i: "D3", n: "Dr. Z", s: "S", c: "C", o: "S01", p: null, m: null, r: 0, f: 0, b: 9.5, pm: 12 })
+  assert.equal(b.bookings, 9.5)
+  assert.equal(b.peers, 12)
 })
 
 test("the public file decodes to the counts the team table shows", () => {

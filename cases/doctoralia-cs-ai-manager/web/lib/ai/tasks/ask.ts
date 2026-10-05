@@ -103,8 +103,8 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "get_kpis",
-    description: "The KPI block for a scope ('all', 'team:<name>' or a specialist id) over a period in days (7, 30 or 90), with n and suppression.",
-    input_schema: { type: "object", properties: { scope: { type: "string" }, period: { type: "string" } } },
+    description: "The KPI block for a scope ('all', 'team:<name>' or a specialist id) over the last 30 days, with n and suppression, and the same scope compared with its team, the whole book and the Mar–Jun baseline (counts per 100 active doctors).",
+    input_schema: { type: "object", properties: { scope: { type: "string" } } },
   },
   {
     name: "get_queue",
@@ -175,11 +175,10 @@ async function runTool(name: string, raw: unknown, i: AskInput, trace: Trace): P
   if (name === "get_kpis") {
     const scope = typeof a.scope === "string" && O.scopes[a.scope] ? a.scope : i.scope
     if (mine && scope !== i.scope && !(/^S\d+$/.test(scope) && mine.has(scope))) return { error: "outside this scope" }
-    const period = String(a.period ?? "30")
-    const periods = (O.scopes[scope] ?? O.scopes.all).periods
-    const k = periods[period] ?? periods["30"]
+    const sc = O.scopes[scope] ?? O.scopes.all
+    const k = sc.periods["30"] ?? Object.values(sc.periods)[0]
     const tx = (v: unknown) => (v && typeof v === "object" ? (v as Record<string, string>)[i.locale] : v)
-    return { scope, window_days: k.window_days, asof: k.asof, totals: k.totals, kpis: k.kpis.map((x) => ({ key: x.key, label: tx(x.label), value: x.value, prev: x.prev, delta_pct: x.delta_pct, n: x.n, suppressed: x.suppressed ? tx(x.suppressed) : undefined })) }
+    return { scope, window_days: k.window_days, asof: k.asof, totals: k.totals, kpis: k.kpis.map((x) => ({ key: x.key, label: tx(x.label), value: x.value, prev: x.prev, delta_pct: x.delta_pct, n: x.n, suppressed: x.suppressed ? tx(x.suppressed) : undefined })), compare: sc.compare }
   }
   if (name === "get_queue") {
     const owner = String(a.owner ?? "")
