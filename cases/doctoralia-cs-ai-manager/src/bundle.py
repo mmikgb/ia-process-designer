@@ -30,7 +30,7 @@ SCHEMA_VERSION = "1.2"
 # The shape of the web view (overview.json, queue/, doctors/, search.json). Bump it whenever
 # the web app starts to need a field; web/scripts/sync-data.mjs refuses to copy an out/ with
 # a lower number over the committed data (a stale out/ used to break /costo silently).
-WEB_SCHEMA = 5
+WEB_SCHEMA = 6
 
 REQUIRED = {
     "doctors": ["doctor_id", "signup_date", "status", "owner_specialist_id",
@@ -159,7 +159,7 @@ def build(xlsx: Path | None = None, use_llm: bool = True, cache: bool = True) ->
         "bookings": frame(t["bookings_monthly"].astype({"mp": str})),
         "interactions": frame(t["interactions"]),
         "series": ser,
-        "spc": spc.build(t, ser),
+        "spc": spc.build(t, ser, tagged),
         "kpi": kpi.build(t, doc, esc, ser, asof),
         "scopes": kpi.scopes(t, doc, esc, asof),
         "team": kpi.team(t, doc, esc, asof),

@@ -36,6 +36,7 @@ function SpcTooltip({ active, payload, fmt, center }: { active?: boolean; payloa
         {p.n != null && <span className="text-background/70"> · n={p.n}</span>}
       </span>
       <span className="text-background/70 tabular-nums">{t("control.tip.limits", { a: fmt(p.lcl), b: fmt(p.ucl), c: fmt(center) })}</span>
+      {p.eligible === false && <span className="text-background/70">{t("control.low_n")}</span>}
       {p.signals.length > 0 && (
         <ul className="mt-1 flex flex-col gap-0.5 font-medium text-[#f5b94a]">
           {p.signals.map((s) => (
@@ -82,6 +83,7 @@ export function ControlChart({ chart, fmt, reading, chartKey }: { chart: SpcChar
           </p>
         )}
         <span className="text-xs text-muted-foreground">{t(`control.kind.${chart.chart}` as Key)}</span>
+        {(chart.excluded_points ?? 0) > 0 && <span className="text-xs text-muted-foreground">{t("control.excluded", { n: chart.excluded_points ?? 0, min: chart.min_n ?? 0 })}</span>}
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <div className="h-64 w-full">

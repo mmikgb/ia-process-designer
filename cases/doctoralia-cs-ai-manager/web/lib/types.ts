@@ -137,18 +137,24 @@ export interface SpcPoint {
   ucl: number
   lcl: number
   signals: string[]
+  eligible?: boolean
 }
 
 export interface SpcChart {
   chart: "p" | "c" | "xmr"
   label: Text
+  available?: boolean
+  data_note?: Text
+  min_n?: number
+  excluded_points?: number
+  snapshot?: { hollow: number; n: number }
   /** the headline: a signal in the last 28 days, or none (spc.finding) */
   finding?: Text
   center: number
   sigma?: number
   baseline: { from: string; to: string; frozen: boolean; n_points: number }
   points: SpcPoint[]
-  stability: { stable: boolean; baseline_out_of_control: number; note: Text }
+  stability: { stable: boolean | null; baseline_out_of_control: number; note: Text }
 }
 
 export interface LeadTime {
